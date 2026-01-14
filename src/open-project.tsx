@@ -179,10 +179,15 @@ interface ProjectPathResult {
   sessionFiles: string[];
 }
 
-function getProjectPathAndFiles(projectDir: string, encodedName: string): ProjectPathResult {
+function getProjectPathAndFiles(
+  projectDir: string,
+  encodedName: string,
+): ProjectPathResult {
   let files: string[];
   try {
-    files = fs.readdirSync(projectDir).filter((f) => f.endsWith(".jsonl") && !f.startsWith("agent-"));
+    files = fs
+      .readdirSync(projectDir)
+      .filter((f) => f.endsWith(".jsonl") && !f.startsWith("agent-"));
   } catch {
     return { path: null, sessionFiles: [] };
   }
@@ -238,7 +243,10 @@ async function loadClaudeProjects(): Promise<ClaudeProject[]> {
     }
 
     const projectDir = path.join(claudeProjectsDir, entry.name);
-    const { path: fullPath, sessionFiles } = getProjectPathAndFiles(projectDir, entry.name);
+    const { path: fullPath, sessionFiles } = getProjectPathAndFiles(
+      projectDir,
+      entry.name,
+    );
 
     if (!fullPath || seenPaths.has(fullPath)) {
       continue;
@@ -262,7 +270,9 @@ async function loadClaudeProjects(): Promise<ClaudeProject[]> {
     });
   }
 
-  return projects.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
+  return projects.sort(
+    (a, b) => b.lastModified.getTime() - a.lastModified.getTime(),
+  );
 }
 
 // ============================================================================
@@ -321,7 +331,12 @@ tell application "iTerm"
 end tell`;
 }
 
-function openInTerminal(projectPath: string, continueSession: boolean, terminal: string, t: I18nStrings) {
+function openInTerminal(
+  projectPath: string,
+  continueSession: boolean,
+  terminal: string,
+  t: I18nStrings,
+) {
   const escapedPath = projectPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   const claudeCmd = continueSession ? "claude -c" : "claude";
   const fullCmd = `cd "${escapedPath}" && ${claudeCmd}`;
@@ -366,7 +381,14 @@ end tell`;
       return;
 
     case "kitty":
-      spawnSync("kitty", ["--single-instance", "--directory", projectPath, "bash", "-c", claudeCmd]);
+      spawnSync("kitty", [
+        "--single-instance",
+        "--directory",
+        projectPath,
+        "bash",
+        "-c",
+        claudeCmd,
+      ]);
       showToast({
         style: Toast.Style.Success,
         title: t.openedInKitty,
@@ -387,7 +409,8 @@ end tell`;
       message: path.basename(projectPath),
     });
   } else {
-    const errorMsg = result.stderr?.trim() || result.error?.message || t.unknownError;
+    const errorMsg =
+      result.stderr?.trim() || result.error?.message || t.unknownError;
     showToast({
       style: Toast.Style.Failure,
       title: t.openTerminalFailed,
@@ -418,13 +441,20 @@ function getQuickShortcut(idx: number) {
 export default function Command() {
   const preferences = getPreferenceValues<Preferences>();
   const t = i18n[preferences.language] || i18n.en;
-  const { value: favorites = [], setValue: setFavorites } = useLocalStorage<string[]>("favorites", []);
+  const { value: favorites = [], setValue: setFavorites } = useLocalStorage<
+    string[]
+  >("favorites", []);
 
-  const { data: projects = [], isLoading, revalidate } = useCachedPromise(loadClaudeProjects, [], {
+  const {
+    data: projects = [],
+    isLoading,
+    revalidate,
+  } = useCachedPromise(loadClaudeProjects, [], {
     keepPreviousData: true,
   });
 
-  const isFavorite = (project: ClaudeProject) => favorites.includes(project.fullPath);
+  const isFavorite = (project: ClaudeProject) =>
+    favorites.includes(project.fullPath);
 
   const toggleFavorite = async (project: ClaudeProject) => {
     const wasFavorite = isFavorite(project);
@@ -455,7 +485,10 @@ export default function Command() {
 
   if (preferences.groupByTime) {
     for (const project of sortedProjects) {
-      const group = preferences.showFavoritesFirst && isFavorite(project) ? "favorites" : getTimeGroup(project.lastModified);
+      const group =
+        preferences.showFavoritesFirst && isFavorite(project)
+          ? "favorites"
+          : getTimeGroup(project.lastModified);
       const existing = groupedProjects.get(group) || [];
       groupedProjects.set(group, [...existing, project]);
     }
@@ -476,7 +509,10 @@ export default function Command() {
         }}
         accessories={[
           { text: t.sessions(project.sessionCount), icon: Icon.Document },
-          { text: formatRelativeTime(project.lastModified, t), icon: Icon.Clock },
+          {
+            text: formatRelativeTime(project.lastModified, t),
+            icon: Icon.Clock,
+          },
         ]}
         actions={
           <ActionPanel>
@@ -485,13 +521,27 @@ export default function Command() {
                 title={t.continueSession}
                 icon={Icon.ArrowRight}
                 shortcut={quickShortcut}
-                onAction={() => openInTerminal(project.fullPath, true, preferences.terminal, t)}
+                onAction={() =>
+                  openInTerminal(
+                    project.fullPath,
+                    true,
+                    preferences.terminal,
+                    t,
+                  )
+                }
               />
               <Action
                 title={t.newSession}
                 icon={Icon.Plus}
                 shortcut={{ modifiers: ["cmd"], key: "n" }}
-                onAction={() => openInTerminal(project.fullPath, false, preferences.terminal, t)}
+                onAction={() =>
+                  openInTerminal(
+                    project.fullPath,
+                    false,
+                    preferences.terminal,
+                    t,
+                  )
+                }
               />
             </ActionPanel.Section>
             <ActionPanel.Section title={t.sectionManage}>
@@ -507,7 +557,10 @@ export default function Command() {
                 shortcut={{ modifiers: ["cmd", "shift"], key: "f" }}
                 onAction={() => showInFinder(project.fullPath)}
               />
-              <Action.OpenWith path={project.fullPath} shortcut={{ modifiers: ["cmd"], key: "o" }} />
+              <Action.OpenWith
+                path={project.fullPath}
+                shortcut={{ modifiers: ["cmd"], key: "o" }}
+              />
               <Action.CopyToClipboard
                 title={t.copyPath}
                 content={project.fullPath}
@@ -544,18 +597,28 @@ export default function Command() {
         />
       ) : preferences.groupByTime ? (
         // Grouped view
-        (["favorites", "today", "thisWeek", "earlier"] as TimeGroup[]).map((group) => {
-          const groupProjects = groupedProjects.get(group);
-          if (!groupProjects || groupProjects.length === 0) return null;
-          return (
-            <List.Section key={group} title={getGroupTitle(group, t)} subtitle={t.projects(groupProjects.length)}>
-              {groupProjects.map((project) => renderProjectItem(project, sortedProjects.indexOf(project)))}
-            </List.Section>
-          );
-        })
+        (["favorites", "today", "thisWeek", "earlier"] as TimeGroup[]).map(
+          (group) => {
+            const groupProjects = groupedProjects.get(group);
+            if (!groupProjects || groupProjects.length === 0) return null;
+            return (
+              <List.Section
+                key={group}
+                title={getGroupTitle(group, t)}
+                subtitle={t.projects(groupProjects.length)}
+              >
+                {groupProjects.map((project) =>
+                  renderProjectItem(project, sortedProjects.indexOf(project)),
+                )}
+              </List.Section>
+            );
+          },
+        )
       ) : (
         // Flat view
-        sortedProjects.map((project, index) => renderProjectItem(project, index))
+        sortedProjects.map((project, index) =>
+          renderProjectItem(project, index),
+        )
       )}
     </List>
   );

@@ -4,7 +4,7 @@
   "title": "Open Claude Code Project",
   "description": "Quickly open recent Claude Code projects in iTerm with the latest session",
   "icon": "extension-icon.png",
-  "author": "mushroom",
+  "author": "mkdirmushroom",
   "categories": [
     "Developer Tools",
     "Productivity"
