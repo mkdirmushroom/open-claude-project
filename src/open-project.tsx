@@ -55,9 +55,11 @@ const i18n = {
     copyPath: "复制路径",
     refresh: "刷新列表",
     openPreferences: "打开偏好设置",
+    configureApi: "配置 API 环境变量",
     // Section titles
     sectionOpen: "打开",
     sectionManage: "管理",
+    sectionConfig: "配置",
     // Toast messages
     openedInTerminal: "已在终端中打开",
     openTerminalFailed: "打开终端失败",
@@ -97,9 +99,11 @@ const i18n = {
     copyPath: "Copy Path",
     refresh: "Refresh",
     openPreferences: "Open Preferences",
+    configureApi: "Configure API Environment",
     // Section titles
     sectionOpen: "Open",
     sectionManage: "Manage",
+    sectionConfig: "Configuration",
     // Toast messages
     openedInTerminal: "Opened in Terminal",
     openTerminalFailed: "Failed to open terminal",
@@ -130,6 +134,8 @@ interface Preferences {
   groupByTime: boolean;
   showFavoritesFirst: boolean;
   language: Language;
+  anthropicBaseUrl?: string;
+  anthropicApiKey?: string;
 }
 
 interface ClaudeProject {
@@ -336,16 +342,42 @@ function escapeForAppleScript(str: string): string {
   return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
+// Build export commands for environment variables
+function buildEnvExports(
+  anthropicBaseUrl?: string,
+  anthropicApiKey?: string,
+): string {
+  const exports: string[] = [];
+  if (anthropicBaseUrl?.trim()) {
+    exports.push(`export ANTHROPIC_BASE_URL='${anthropicBaseUrl.replace(/'/g, `'"'"'`)}'`);
+  }
+  if (anthropicApiKey?.trim()) {
+    exports.push(`export ANTHROPIC_API_KEY='${anthropicApiKey.replace(/'/g, `'"'"'`)}'`);
+  }
+  return exports.join(" && ");
+}
+
 function openInTerminal(
   projectPath: string,
   continueSession: boolean,
   terminal: string,
   t: I18nStrings,
+  anthropicBaseUrl?: string,
+  anthropicApiKey?: string,
 ) {
   const claudeCmd = continueSession ? "claude -c" : "claude";
   // Use single quotes for shell (only need to escape single quotes)
   const shellSafePath = projectPath.replace(/'/g, `'"'"'`);
-  const fullCmd = `cd '${shellSafePath}' && ${claudeCmd}`;
+
+  // Build environment variable exports
+  const envExports = buildEnvExports(anthropicBaseUrl, anthropicApiKey);
+
+  // Build full command with env vars
+  const cdCmd = `cd '${shellSafePath}'`;
+  const fullCmd = envExports
+    ? `${envExports} && ${cdCmd} && ${claudeCmd}`
+    : `${cdCmd} && ${claudeCmd}`;
+
   // Escape entire command for AppleScript embedding
   const appleScriptCmd = escapeForAppleScript(fullCmd);
 
@@ -535,6 +567,8 @@ export default function Command() {
                     true,
                     preferences.terminal,
                     t,
+                    preferences.anthropicBaseUrl,
+                    preferences.anthropicApiKey,
                   )
                 }
               />
@@ -548,6 +582,8 @@ export default function Command() {
                     false,
                     preferences.terminal,
                     t,
+                    preferences.anthropicBaseUrl,
+                    preferences.anthropicApiKey,
                   )
                 }
               />
@@ -575,7 +611,13 @@ export default function Command() {
                 shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
               />
             </ActionPanel.Section>
-            <ActionPanel.Section>
+            <ActionPanel.Section title={t.sectionConfig}>
+              <Action
+                title={t.configureApi}
+                icon={Icon.Key}
+                shortcut={{ modifiers: ["cmd", "shift"], key: "a" }}
+                onAction={openExtensionPreferences}
+              />
               <Action
                 title={t.refresh}
                 icon={Icon.ArrowClockwise}

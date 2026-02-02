@@ -63,6 +63,22 @@
         { "title": "中文", "value": "zh" },
         { "title": "English", "value": "en" }
       ]
+    },
+    {
+      "name": "anthropicBaseUrl",
+      "type": "textfield",
+      "required": false,
+      "title": "Anthropic Base URL",
+      "description": "Custom API base URL (e.g., https://api.kimi.com/coding/) - Optional",
+      "placeholder": "https://api.anthropic.com/"
+    },
+    {
+      "name": "anthropicApiKey",
+      "type": "password",
+      "required": false,
+      "title": "Anthropic API Key",
+      "description": "Custom API key - Optional (will be injected as ANTHROPIC_API_KEY)",
+      "placeholder": "sk-..."
     }
   ],
   "dependencies": {

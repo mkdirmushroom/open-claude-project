@@ -15,7 +15,11 @@ type ExtensionPreferences = {
   /** Favorites First - Always show favorited projects at the top */
   "showFavoritesFirst": boolean,
   /** Language / 语言 - Choose display language / 选择显示语言 */
-  "language": "zh" | "en"
+  "language": "zh" | "en",
+  /** Anthropic Base URL - Custom API base URL (e.g., https://api.kimi.com/coding/) - Optional */
+  "anthropicBaseUrl"?: string,
+  /** Anthropic API Key - Custom API key - Optional (will be injected as ANTHROPIC_API_KEY) */
+  "anthropicApiKey"?: string
 }
 
 /** Preferences accessible in all the extension's commands */
