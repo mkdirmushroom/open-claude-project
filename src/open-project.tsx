@@ -1,6 +1,7 @@
 import {
   Action,
   ActionPanel,
+  Form,
   List,
   showToast,
   Toast,
@@ -8,8 +9,10 @@ import {
   Color,
   getPreferenceValues,
   openExtensionPreferences,
+  useNavigation,
 } from "@raycast/api";
 import { useCachedPromise, useLocalStorage } from "@raycast/utils";
+import { useState } from "react";
 import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
@@ -26,6 +29,136 @@ const MS_PER_MINUTE = 60000;
 const MS_PER_HOUR = 3600000;
 const MS_PER_DAY = 86400000;
 const DAYS_IN_WEEK = 7;
+
+const DENY_DANGEROUS = [
+  "Bash(rm -rf *)", "Bash(sudo *)",
+  "Bash(git push --force*)", "Bash(git reset --hard*)",
+  "Read(**/.env)", "Read(**/.env.*)",
+  "Read(**/*.pem)", "Read(**/*.key)", "Read(**/*_rsa)",
+];
+
+interface PresetConfig {
+  defaultMode?: string;
+  allow: string[];
+  deny: string[];
+}
+
+const PERMISSION_PRESETS: Record<string, PresetConfig> = {
+  strict: {
+    allow: ["Glob", "Grep", "Read"],
+    deny: DENY_DANGEROUS,
+  },
+  standard: {
+    defaultMode: "acceptEdits",
+    allow: [
+      "Bash(echo:*)", "Bash(gh:*)", "Bash(git:*)", "Bash(ls:*)",
+      "Bash(node:*)", "Bash(npm:*)", "Bash(npx:*)", "Bash(tree:*)",
+      "Edit", "Glob", "Grep", "Read", "WebSearch", "Write",
+    ],
+    deny: DENY_DANGEROUS,
+  },
+  permissive: {
+    defaultMode: "acceptEdits",
+    allow: [
+      "Bash", "Edit", "Glob", "Grep",
+      "Read", "WebFetch", "WebSearch", "Write",
+    ],
+    deny: DENY_DANGEROUS,
+  },
+};
+
+interface CatalogRule {
+  pattern: string;
+  type: "allow" | "deny";
+  section: string;
+  zh: string;
+  en: string;
+}
+
+const CATALOG_SECTIONS = [
+  { key: "fileOps", zh: "文件操作", en: "File Operations" },
+  { key: "vcs", zh: "版本控制", en: "Version Control" },
+  { key: "pkgMgmt", zh: "包管理", en: "Package Management" },
+  { key: "runtime", zh: "运行时", en: "Runtimes" },
+  { key: "system", zh: "系统工具", en: "System Tools" },
+  { key: "bashAll", zh: "全部 Bash", en: "All Bash" },
+  { key: "network", zh: "网络", en: "Network" },
+  { key: "safety", zh: "安全防护 (Deny)", en: "Safety (Deny)" },
+];
+
+const MODE_OPTIONS = [
+  { value: "default", zh: "默认 — 每次操作都需确认", en: "Default — confirm every operation" },
+  { value: "acceptEdits", zh: "自动接受编辑 — 文件编辑自动通过", en: "Auto-accept edits — file changes auto-approved" },
+  { value: "plan", zh: "计划模式 — 只分析不修改", en: "Plan mode — analyze only, no changes" },
+  { value: "bypassPermissions", zh: "跳过权限 — 仅限容器/VM", en: "Bypass — containers/VMs only" },
+];
+
+const PERMISSION_CATALOG: CatalogRule[] = [
+  // File Operations
+  { pattern: "Read", type: "allow", section: "fileOps", zh: "读取文件", en: "Read files" },
+  { pattern: "Write", type: "allow", section: "fileOps", zh: "写入文件", en: "Write files" },
+  { pattern: "Edit", type: "allow", section: "fileOps", zh: "编辑文件", en: "Edit files" },
+  { pattern: "Glob", type: "allow", section: "fileOps", zh: "按模式搜索文件", en: "Search files by pattern" },
+  { pattern: "Grep", type: "allow", section: "fileOps", zh: "搜索文件内容", en: "Search file contents" },
+  { pattern: "NotebookEdit", type: "allow", section: "fileOps", zh: "编辑 Jupyter Notebook", en: "Edit Jupyter Notebooks" },
+  // Version Control
+  { pattern: "Bash(git:*)", type: "allow", section: "vcs", zh: "Git 操作", en: "Git operations" },
+  { pattern: "Bash(gh:*)", type: "allow", section: "vcs", zh: "GitHub CLI", en: "GitHub CLI" },
+  // Package Management
+  { pattern: "Bash(npm:*)", type: "allow", section: "pkgMgmt", zh: "npm 命令", en: "npm commands" },
+  { pattern: "Bash(npx:*)", type: "allow", section: "pkgMgmt", zh: "npx 执行", en: "npx execution" },
+  { pattern: "Bash(yarn:*)", type: "allow", section: "pkgMgmt", zh: "Yarn 命令", en: "Yarn commands" },
+  { pattern: "Bash(pnpm:*)", type: "allow", section: "pkgMgmt", zh: "pnpm 命令", en: "pnpm commands" },
+  { pattern: "Bash(bun:*)", type: "allow", section: "pkgMgmt", zh: "Bun 命令", en: "Bun commands" },
+  { pattern: "Bash(pip:*)", type: "allow", section: "pkgMgmt", zh: "pip 包管理", en: "pip packages" },
+  { pattern: "Bash(uv:*)", type: "allow", section: "pkgMgmt", zh: "uv (Python)", en: "uv (Python)" },
+  { pattern: "Bash(cargo:*)", type: "allow", section: "pkgMgmt", zh: "Cargo (Rust)", en: "Cargo (Rust)" },
+  { pattern: "Bash(brew:*)", type: "allow", section: "pkgMgmt", zh: "Homebrew", en: "Homebrew" },
+  // Runtimes
+  { pattern: "Bash(node:*)", type: "allow", section: "runtime", zh: "Node.js", en: "Node.js" },
+  { pattern: "Bash(python:*)", type: "allow", section: "runtime", zh: "Python", en: "Python" },
+  { pattern: "Bash(python3:*)", type: "allow", section: "runtime", zh: "Python 3", en: "Python 3" },
+  { pattern: "Bash(swift:*)", type: "allow", section: "runtime", zh: "Swift", en: "Swift" },
+  { pattern: "Bash(go:*)", type: "allow", section: "runtime", zh: "Go", en: "Go" },
+  { pattern: "Bash(ruby:*)", type: "allow", section: "runtime", zh: "Ruby", en: "Ruby" },
+  { pattern: "Bash(java:*)", type: "allow", section: "runtime", zh: "Java", en: "Java" },
+  { pattern: "Bash(javac:*)", type: "allow", section: "runtime", zh: "Java 编译器", en: "Java compiler" },
+  // System Tools
+  { pattern: "Bash(ls:*)", type: "allow", section: "system", zh: "列出目录", en: "List directory" },
+  { pattern: "Bash(tree:*)", type: "allow", section: "system", zh: "目录树", en: "Directory tree" },
+  { pattern: "Bash(echo:*)", type: "allow", section: "system", zh: "echo 输出", en: "Echo output" },
+  { pattern: "Bash(cat:*)", type: "allow", section: "system", zh: "查看文件内容", en: "View file content" },
+  { pattern: "Bash(head:*)", type: "allow", section: "system", zh: "查看文件头部", en: "View file head" },
+  { pattern: "Bash(tail:*)", type: "allow", section: "system", zh: "查看文件尾部", en: "View file tail" },
+  { pattern: "Bash(wc:*)", type: "allow", section: "system", zh: "统计字数/行数", en: "Word/line count" },
+  { pattern: "Bash(which:*)", type: "allow", section: "system", zh: "查找命令路径", en: "Find command path" },
+  { pattern: "Bash(diff:*)", type: "allow", section: "system", zh: "文件差异比较", en: "File diff" },
+  { pattern: "Bash(mkdir:*)", type: "allow", section: "system", zh: "创建目录", en: "Create directory" },
+  { pattern: "Bash(cp:*)", type: "allow", section: "system", zh: "复制文件", en: "Copy files" },
+  { pattern: "Bash(mv:*)", type: "allow", section: "system", zh: "移动/重命名文件", en: "Move/rename files" },
+  { pattern: "Bash(date:*)", type: "allow", section: "system", zh: "日期时间", en: "Date/time" },
+  { pattern: "Bash(make:*)", type: "allow", section: "system", zh: "Make 构建", en: "Make build" },
+  { pattern: "Bash(docker:*)", type: "allow", section: "system", zh: "Docker 容器", en: "Docker containers" },
+  { pattern: "Bash(kubectl:*)", type: "allow", section: "system", zh: "Kubernetes CLI", en: "Kubernetes CLI" },
+  { pattern: "Bash(curl:*)", type: "allow", section: "system", zh: "cURL 请求", en: "cURL requests" },
+  // All Bash
+  { pattern: "Bash", type: "allow", section: "bashAll", zh: "全部 Bash 命令", en: "All Bash commands" },
+  // Network
+  { pattern: "WebSearch", type: "allow", section: "network", zh: "网络搜索", en: "Web search" },
+  { pattern: "WebFetch", type: "allow", section: "network", zh: "网络请求", en: "Web fetch" },
+  // Safety (Deny)
+  { pattern: "Bash(rm -rf *)", type: "deny", section: "safety", zh: "禁止递归删除", en: "Block recursive delete" },
+  { pattern: "Bash(sudo *)", type: "deny", section: "safety", zh: "禁止 sudo 提权", en: "Block sudo" },
+  { pattern: "Bash(git push --force*)", type: "deny", section: "safety", zh: "禁止强制推送", en: "Block force push" },
+  { pattern: "Bash(git reset --hard*)", type: "deny", section: "safety", zh: "禁止硬重置", en: "Block hard reset" },
+  { pattern: "Read(**/.env)", type: "deny", section: "safety", zh: "禁止读取 .env", en: "Block reading .env" },
+  { pattern: "Read(**/.env.*)", type: "deny", section: "safety", zh: "禁止读取 .env.*", en: "Block reading .env.*" },
+  { pattern: "Read(**/*.pem)", type: "deny", section: "safety", zh: "禁止读取证书", en: "Block reading certs" },
+  { pattern: "Read(**/*.key)", type: "deny", section: "safety", zh: "禁止读取私钥", en: "Block reading keys" },
+  { pattern: "Read(**/*_rsa)", type: "deny", section: "safety", zh: "禁止读取 RSA 密钥", en: "Block reading RSA keys" },
+  { pattern: "Read(**/*credentials*)", type: "deny", section: "safety", zh: "禁止读取凭证文件", en: "Block reading credentials" },
+  { pattern: "Read(**/*secret*)", type: "deny", section: "safety", zh: "禁止读取密钥文件", en: "Block reading secrets" },
+];
 
 // ============================================================================
 // i18n - Internationalization
@@ -75,6 +208,33 @@ const i18n = {
     noProjectsDesc: "开始使用 Claude Code 后项目会显示在这里",
     // Search
     searchPlaceholder: "搜索 Claude Code 项目...",
+    // Permissions
+    permManage: "权限设置",
+    permStrict: "严格模式",
+    permStandard: "标准模式",
+    permPermissive: "宽松模式",
+    permCustom: "自定义",
+    permDefault: "默认",
+    permStrictDesc: "只读 + 保护敏感文件",
+    permStandardDesc: "自动接受编辑 + 常用命令",
+    permPermissiveDesc: "自动接受编辑 + 全部命令",
+    permApplied: "已应用权限模式",
+    permOpenEditor: "在编辑器中编辑权限",
+    permReset: "恢复默认",
+    permResetDone: "已恢复默认权限",
+    permCustomEdit: "自定义权限",
+    permEnable: "启用",
+    permDisable: "禁用",
+    permSectionMode: "权限模式",
+    permAddRule: "新增规则",
+    permDeleteRule: "删除规则",
+    permRulePattern: "规则模式",
+    permRuleType: "规则类型",
+    permCustomRules: "自定义规则",
+    permRuleAdded: "规则已添加",
+    permRuleDeleted: "规则已删除",
+    permRulePlaceholder: "例如: Bash(command:*)",
+    permRuleExists: "规则已存在",
   },
   en: {
     // Time
@@ -119,6 +279,33 @@ const i18n = {
     noProjectsDesc: "Projects will appear here after using Claude Code",
     // Search
     searchPlaceholder: "Search Claude Code projects...",
+    // Permissions
+    permManage: "Permissions",
+    permStrict: "Strict",
+    permStandard: "Standard",
+    permPermissive: "Permissive",
+    permCustom: "Custom",
+    permDefault: "Default",
+    permStrictDesc: "Read-only + protect sensitive files",
+    permStandardDesc: "Auto-accept edits + common commands",
+    permPermissiveDesc: "Auto-accept edits + all commands",
+    permApplied: "Permission mode applied",
+    permOpenEditor: "Edit Permissions in Editor",
+    permReset: "Reset to Default",
+    permResetDone: "Permissions reset to default",
+    permCustomEdit: "Custom Permissions",
+    permEnable: "Enable",
+    permDisable: "Disable",
+    permSectionMode: "Permission Mode",
+    permAddRule: "Add Rule",
+    permDeleteRule: "Delete Rule",
+    permRulePattern: "Rule Pattern",
+    permRuleType: "Rule Type",
+    permCustomRules: "Custom Rules",
+    permRuleAdded: "Rule added",
+    permRuleDeleted: "Rule deleted",
+    permRulePlaceholder: "e.g. Bash(command:*)",
+    permRuleExists: "Rule already exists",
   },
 };
 
@@ -134,6 +321,7 @@ interface Preferences {
   groupByTime: boolean;
   showFavoritesFirst: boolean;
   language: Language;
+  defaultPreset?: "" | "strict" | "standard" | "permissive";
   anthropicBaseUrl?: string;
   anthropicApiKey?: string;
 }
@@ -144,9 +332,11 @@ interface ClaudeProject {
   encodedName: string;
   lastModified: Date;
   sessionCount: number;
+  permissionPreset: PermissionPreset;
 }
 
 type TimeGroup = "favorites" | "today" | "thisWeek" | "earlier";
+type PermissionPreset = "strict" | "standard" | "permissive" | "custom" | "default";
 
 // ============================================================================
 // Data Loading Functions
@@ -232,7 +422,7 @@ function getProjectPathAndFiles(
   return { path: null, sessionFiles: files };
 }
 
-async function loadClaudeProjects(): Promise<ClaudeProject[]> {
+async function loadClaudeProjects(defaultPreset?: string): Promise<ClaudeProject[]> {
   const claudeProjectsDir = path.join(os.homedir(), ".claude", "projects");
 
   if (!fs.existsSync(claudeProjectsDir)) {
@@ -267,12 +457,19 @@ async function loadClaudeProjects(): Promise<ClaudeProject[]> {
       continue;
     }
 
+    let preset = detectPreset(fullPath);
+    if (preset === "default" && defaultPreset && defaultPreset in PERMISSION_PRESETS) {
+      writePermissionPreset(fullPath, defaultPreset);
+      preset = defaultPreset as PermissionPreset;
+    }
+
     projects.push({
       name: path.basename(fullPath),
       fullPath,
       encodedName: entry.name,
       lastModified: stats.mtime,
       sessionCount: sessionFiles.length,
+      permissionPreset: preset,
     });
   }
 
@@ -320,6 +517,369 @@ function getGroupTitle(group: TimeGroup, t: I18nStrings): string {
     case "earlier":
       return t.earlier;
   }
+}
+
+// ============================================================================
+// Permission Functions
+// ============================================================================
+
+function getSettingsPath(projectPath: string): string {
+  return path.join(projectPath, ".claude", "settings.local.json");
+}
+
+function sortedJson(arr: string[]): string {
+  return JSON.stringify([...arr].sort());
+}
+
+function detectPreset(projectPath: string): PermissionPreset {
+  const settingsPath = getSettingsPath(projectPath);
+  if (!fs.existsSync(settingsPath)) return "default";
+  try {
+    const content = fs.readFileSync(settingsPath, "utf-8");
+    const settings = JSON.parse(content);
+    const allow = settings.permissions?.allow || [];
+    const deny = settings.permissions?.deny || [];
+    const mode = settings.defaultMode;
+    if (allow.length === 0 && deny.length === 0 && !mode) return "default";
+    for (const [name, preset] of Object.entries(PERMISSION_PRESETS)) {
+      if (
+        sortedJson(allow) === sortedJson(preset.allow) &&
+        sortedJson(deny) === sortedJson(preset.deny) &&
+        mode === preset.defaultMode
+      ) {
+        return name as PermissionPreset;
+      }
+    }
+    return "custom";
+  } catch {
+    return "default";
+  }
+}
+
+function writePermissionPreset(projectPath: string, presetName: string): void {
+  const claudeDir = path.join(projectPath, ".claude");
+  const settingsPath = path.join(claudeDir, "settings.local.json");
+  if (!fs.existsSync(claudeDir)) {
+    fs.mkdirSync(claudeDir, { recursive: true });
+  }
+  let settings: Record<string, unknown> = {};
+  if (fs.existsSync(settingsPath)) {
+    try {
+      settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+    } catch {
+      settings = {};
+    }
+  }
+  const preset = PERMISSION_PRESETS[presetName];
+  if (preset.defaultMode) {
+    settings.defaultMode = preset.defaultMode;
+  } else {
+    delete settings.defaultMode;
+  }
+  settings.permissions = { allow: preset.allow, deny: preset.deny };
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+}
+
+function resetPermissions(projectPath: string): void {
+  const settingsPath = getSettingsPath(projectPath);
+  if (!fs.existsSync(settingsPath)) return;
+  try {
+    const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+    delete settings.defaultMode;
+    delete settings.permissions;
+    if (Object.keys(settings).length === 0) {
+      fs.unlinkSync(settingsPath);
+    } else {
+      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function getPresetDisplay(
+  preset: PermissionPreset,
+  t: I18nStrings,
+): { label: string; color: Color } {
+  switch (preset) {
+    case "strict":
+      return { label: t.permStrict, color: Color.Blue };
+    case "standard":
+      return { label: t.permStandard, color: Color.Green };
+    case "permissive":
+      return { label: t.permPermissive, color: Color.Orange };
+    case "custom":
+      return { label: t.permCustom, color: Color.Purple };
+    default:
+      return { label: t.permDefault, color: Color.SecondaryText };
+  }
+}
+
+function saveSettings(projectPath: string, settings: Record<string, unknown>): void {
+  const claudeDir = path.join(projectPath, ".claude");
+  const settingsPath = path.join(claudeDir, "settings.local.json");
+  if (!fs.existsSync(claudeDir)) {
+    fs.mkdirSync(claudeDir, { recursive: true });
+  }
+  // Deep clone to avoid mutating React state
+  const clean = JSON.parse(JSON.stringify(settings)) as Record<string, unknown>;
+  const perms = clean.permissions as Record<string, unknown> | undefined;
+  if (perms) {
+    if (Array.isArray(perms.allow) && perms.allow.length === 0) delete perms.allow;
+    if (Array.isArray(perms.deny) && perms.deny.length === 0) delete perms.deny;
+    if (Object.keys(perms).length === 0) delete clean.permissions;
+  }
+  if (Object.keys(clean).length === 0) {
+    if (fs.existsSync(settingsPath)) fs.unlinkSync(settingsPath);
+    return;
+  }
+  fs.writeFileSync(settingsPath, JSON.stringify(clean, null, 2) + "\n");
+}
+
+// ============================================================================
+// Permission Editor Components
+// ============================================================================
+
+function AddRuleForm({
+  lang,
+  onSubmit,
+}: {
+  lang: Language;
+  onSubmit: (pattern: string, type: "allow" | "deny") => void;
+}) {
+  const { pop } = useNavigation();
+  const t = i18n[lang];
+
+  return (
+    <Form
+      navigationTitle={t.permAddRule}
+      actions={
+        <ActionPanel>
+          <Action.SubmitForm
+            title={t.permAddRule}
+            icon={Icon.Plus}
+            onSubmit={(values: { pattern: string; type: string }) => {
+              const pattern = values.pattern.trim();
+              if (!pattern) return;
+              onSubmit(pattern, values.type as "allow" | "deny");
+              pop();
+            }}
+          />
+        </ActionPanel>
+      }
+    >
+      <Form.TextField
+        id="pattern"
+        title={t.permRulePattern}
+        placeholder={t.permRulePlaceholder}
+      />
+      <Form.Dropdown id="type" title={t.permRuleType} defaultValue="allow">
+        <Form.Dropdown.Item
+          value="allow"
+          title="Allow"
+          icon={{ source: Icon.CheckCircle, tintColor: Color.Green }}
+        />
+        <Form.Dropdown.Item
+          value="deny"
+          title="Deny"
+          icon={{ source: Icon.XMarkCircle, tintColor: Color.Red }}
+        />
+      </Form.Dropdown>
+    </Form>
+  );
+}
+
+const CATALOG_ALLOW_PATTERNS = new Set(
+  PERMISSION_CATALOG.filter((r) => r.type === "allow").map((r) => r.pattern),
+);
+const CATALOG_DENY_PATTERNS = new Set(
+  PERMISSION_CATALOG.filter((r) => r.type === "deny").map((r) => r.pattern),
+);
+
+function PermissionEditor({
+  projectPath,
+  lang,
+  onUpdate,
+}: {
+  projectPath: string;
+  lang: Language;
+  onUpdate: () => void;
+}) {
+  const t = i18n[lang];
+  const [settings, setSettings] = useState<Record<string, unknown>>(() => {
+    const settingsPath = getSettingsPath(projectPath);
+    if (fs.existsSync(settingsPath)) {
+      try {
+        return JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  });
+
+  const perms = (settings.permissions as Record<string, unknown>) || {};
+  const allow: string[] = (perms.allow as string[]) || [];
+  const deny: string[] = (perms.deny as string[]) || [];
+  const currentMode = (settings.defaultMode as string) || "default";
+
+  // Find rules not in the catalog
+  const customRules = [
+    ...allow.filter((p) => !CATALOG_ALLOW_PATTERNS.has(p)).map((p) => ({ pattern: p, type: "allow" as const })),
+    ...deny.filter((p) => !CATALOG_DENY_PATTERNS.has(p)).map((p) => ({ pattern: p, type: "deny" as const })),
+  ];
+
+  const update = (newSettings: Record<string, unknown>) => {
+    setSettings(newSettings);
+    saveSettings(projectPath, newSettings);
+    onUpdate();
+  };
+
+  const toggleRule = (pattern: string, type: "allow" | "deny") => {
+    const list = type === "allow" ? [...allow] : [...deny];
+    const idx = list.indexOf(pattern);
+    if (idx >= 0) list.splice(idx, 1);
+    else list.push(pattern);
+    const newPerms = { ...perms, [type]: list };
+    update({ ...settings, permissions: newPerms });
+  };
+
+  const addRule = (pattern: string, type: "allow" | "deny") => {
+    const list = type === "allow" ? allow : deny;
+    if (list.includes(pattern)) {
+      showToast({ style: Toast.Style.Failure, title: t.permRuleExists });
+      return;
+    }
+    toggleRule(pattern, type);
+    showToast({ style: Toast.Style.Success, title: t.permRuleAdded, message: pattern });
+  };
+
+  const setMode = (value: string) => {
+    const next = { ...settings };
+    if (value === "default") delete next.defaultMode;
+    else next.defaultMode = value;
+    update(next);
+  };
+
+  const commonActions = (
+    <>
+      <Action.Push
+        title={t.permAddRule}
+        icon={Icon.Plus}
+        shortcut={{ modifiers: ["cmd"], key: "n" }}
+        target={<AddRuleForm lang={lang} onSubmit={addRule} />}
+      />
+      <Action
+        title={t.permOpenEditor}
+        icon={Icon.CodeBlock}
+        shortcut={{ modifiers: ["cmd", "shift"], key: "e" }}
+        onAction={() => {
+          const sp = getSettingsPath(projectPath);
+          if (!fs.existsSync(sp)) saveSettings(projectPath, settings);
+          spawnSync("open", ["-t", sp]);
+        }}
+      />
+    </>
+  );
+
+  return (
+    <List navigationTitle={`${t.permCustomEdit} — ${path.basename(projectPath)}`}>
+      <List.Section title={t.permSectionMode}>
+        {MODE_OPTIONS.map((option) => (
+          <List.Item
+            key={option.value}
+            title={lang === "zh" ? option.zh : option.en}
+            icon={
+              currentMode === option.value
+                ? { source: Icon.CheckCircle, tintColor: Color.Green }
+                : Icon.Circle
+            }
+            actions={
+              <ActionPanel>
+                <Action
+                  title={currentMode === option.value ? t.permDisable : t.permEnable}
+                  icon={Icon.Switch}
+                  onAction={() => setMode(currentMode === option.value ? "default" : option.value)}
+                />
+                {commonActions}
+              </ActionPanel>
+            }
+          />
+        ))}
+      </List.Section>
+      {customRules.length > 0 && (
+        <List.Section title={t.permCustomRules}>
+          {customRules.map((rule) => (
+            <List.Item
+              key={`custom-${rule.type}-${rule.pattern}`}
+              title={rule.pattern}
+              icon={{ source: Icon.CheckCircle, tintColor: rule.type === "allow" ? Color.Green : Color.Red }}
+              accessories={[
+                {
+                  tag: {
+                    value: rule.type === "allow" ? "Allow" : "Deny",
+                    color: rule.type === "allow" ? Color.Green : Color.Red,
+                  },
+                },
+              ]}
+              actions={
+                <ActionPanel>
+                  <Action
+                    title={t.permDeleteRule}
+                    icon={Icon.Trash}
+                    style={Action.Style.Destructive}
+                    onAction={() => {
+                      toggleRule(rule.pattern, rule.type);
+                      showToast({ style: Toast.Style.Success, title: t.permRuleDeleted, message: rule.pattern });
+                    }}
+                  />
+                  {commonActions}
+                </ActionPanel>
+              }
+            />
+          ))}
+        </List.Section>
+      )}
+      {CATALOG_SECTIONS.map((section) => (
+        <List.Section key={section.key} title={lang === "zh" ? section.zh : section.en}>
+          {PERMISSION_CATALOG.filter((r) => r.section === section.key).map((rule) => {
+            const list = rule.type === "allow" ? allow : deny;
+            const enabled = list.includes(rule.pattern);
+            return (
+              <List.Item
+                key={`${rule.type}-${rule.pattern}`}
+                title={rule.pattern}
+                subtitle={lang === "zh" ? rule.zh : rule.en}
+                icon={
+                  enabled
+                    ? { source: Icon.CheckCircle, tintColor: rule.type === "allow" ? Color.Green : Color.Red }
+                    : Icon.Circle
+                }
+                accessories={[
+                  {
+                    tag: {
+                      value: rule.type === "allow" ? "Allow" : "Deny",
+                      color: rule.type === "allow" ? Color.Green : Color.Red,
+                    },
+                  },
+                ]}
+                actions={
+                  <ActionPanel>
+                    <Action
+                      title={enabled ? t.permDisable : t.permEnable}
+                      icon={enabled ? Icon.Circle : Icon.CheckCircle}
+                      onAction={() => toggleRule(rule.pattern, rule.type)}
+                    />
+                    {commonActions}
+                  </ActionPanel>
+                }
+              />
+            );
+          })}
+        </List.Section>
+      ))}
+    </List>
+  );
 }
 
 // ============================================================================
@@ -489,7 +1049,7 @@ export default function Command() {
     data: projects = [],
     isLoading,
     revalidate,
-  } = useCachedPromise(loadClaudeProjects, [], {
+  } = useCachedPromise(loadClaudeProjects, [preferences.defaultPreset || undefined], {
     keepPreviousData: true,
   });
 
@@ -537,6 +1097,7 @@ export default function Command() {
   const renderProjectItem = (project: ClaudeProject, index: number) => {
     const favorite = isFavorite(project);
     const quickShortcut = getQuickShortcut(index);
+    const presetDisplay = getPresetDisplay(project.permissionPreset, t);
 
     return (
       <List.Item
@@ -548,6 +1109,9 @@ export default function Command() {
           tintColor: favorite ? Color.Yellow : Color.Orange,
         }}
         accessories={[
+          ...(project.permissionPreset !== "default"
+            ? [{ tag: { value: presetDisplay.label, color: presetDisplay.color } }]
+            : []),
           { text: t.sessions(project.sessionCount), icon: Icon.Document },
           {
             text: formatRelativeTime(project.lastModified, t),
@@ -612,6 +1176,59 @@ export default function Command() {
               />
             </ActionPanel.Section>
             <ActionPanel.Section title={t.sectionConfig}>
+              <ActionPanel.Submenu
+                title={t.permManage}
+                icon={Icon.Lock}
+                shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
+              >
+                <Action
+                  title={`${t.permStrict} — ${t.permStrictDesc}`}
+                  icon={project.permissionPreset === "strict" ? Icon.CheckCircle : Icon.Circle}
+                  onAction={() => {
+                    writePermissionPreset(project.fullPath, "strict");
+                    revalidate();
+                    showToast({ style: Toast.Style.Success, title: t.permApplied, message: t.permStrict });
+                  }}
+                />
+                <Action
+                  title={`${t.permStandard} — ${t.permStandardDesc}`}
+                  icon={project.permissionPreset === "standard" ? Icon.CheckCircle : Icon.Circle}
+                  onAction={() => {
+                    writePermissionPreset(project.fullPath, "standard");
+                    revalidate();
+                    showToast({ style: Toast.Style.Success, title: t.permApplied, message: t.permStandard });
+                  }}
+                />
+                <Action
+                  title={`${t.permPermissive} — ${t.permPermissiveDesc}`}
+                  icon={project.permissionPreset === "permissive" ? Icon.CheckCircle : Icon.Circle}
+                  onAction={() => {
+                    writePermissionPreset(project.fullPath, "permissive");
+                    revalidate();
+                    showToast({ style: Toast.Style.Success, title: t.permApplied, message: t.permPermissive });
+                  }}
+                />
+                <Action
+                  title={t.permReset}
+                  icon={Icon.XMarkCircle}
+                  onAction={() => {
+                    resetPermissions(project.fullPath);
+                    revalidate();
+                    showToast({ style: Toast.Style.Success, title: t.permResetDone });
+                  }}
+                />
+                <Action.Push
+                  title={t.permCustomEdit}
+                  icon={Icon.List}
+                  target={
+                    <PermissionEditor
+                      projectPath={project.fullPath}
+                      lang={preferences.language}
+                      onUpdate={revalidate}
+                    />
+                  }
+                />
+              </ActionPanel.Submenu>
               <Action
                 title={t.configureApi}
                 icon={Icon.Key}

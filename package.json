@@ -65,6 +65,20 @@
       ]
     },
     {
+      "name": "defaultPreset",
+      "type": "dropdown",
+      "required": false,
+      "title": "Default Permission Preset",
+      "description": "Auto-apply this preset to new projects without permissions",
+      "default": "",
+      "data": [
+        { "title": "None", "value": "" },
+        { "title": "Strict", "value": "strict" },
+        { "title": "Standard", "value": "standard" },
+        { "title": "Permissive", "value": "permissive" }
+      ]
+    },
+    {
       "name": "anthropicBaseUrl",
       "type": "textfield",
       "required": false,

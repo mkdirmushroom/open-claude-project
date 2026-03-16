@@ -16,6 +16,8 @@ type ExtensionPreferences = {
   "showFavoritesFirst": boolean,
   /** Language / 语言 - Choose display language / 选择显示语言 */
   "language": "zh" | "en",
+  /** Default Permission Preset - Auto-apply this preset to new projects without permissions */
+  "defaultPreset": "" | "strict" | "standard" | "permissive",
   /** Anthropic Base URL - Custom API base URL (e.g., https://api.kimi.com/coding/) - Optional */
   "anthropicBaseUrl"?: string,
   /** Anthropic API Key - Custom API key - Optional (will be injected as ANTHROPIC_API_KEY) */
