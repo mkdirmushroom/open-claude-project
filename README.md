@@ -7,11 +7,15 @@ A [Raycast](https://raycast.com) extension to quickly open recent [Claude Code](
 ## Features
 
 - **Quick Access** - Browse and open recent Claude Code projects with a single keystroke
-- **Multiple Terminals** - Support for iTerm, Terminal.app, Warp, Alacritty, and Kitty
+- **Multiple Terminals** - Support for iTerm, Terminal.app, Warp, Alacritty, Kitty, and Ghostty
 - **Favorites** - Pin frequently used projects to the top
 - **Time Grouping** - Projects organized by Today, This Week, and Earlier
 - **Quick Shortcuts** - `Cmd+1/2/3` to instantly open top 3 projects
 - **Permission Management** - Per-project Claude Code permission presets and a visual rule editor
+- **IDE Integration** - Open projects directly in VS Code, Cursor, Zed, or WebStorm
+- **Session Picker** - Browse and resume specific sessions, not just the latest
+- **Project Cleanup** - Remove stale project entries with one click
+- **Batch Permissions** - Apply a permission preset to all projects at once
 - **Bilingual** - English and Chinese interface
 
 ## Installation
@@ -63,6 +67,8 @@ All presets include deny rules for dangerous operations (`rm -rf`, `sudo`, `git 
 | `Cmd+N` | New session (`claude`) |
 | `Cmd+D` | Toggle favorite |
 | `Cmd+1/2/3` | Quick open top 3 projects |
+| `Cmd+Shift+S` | Select session to resume |
+| `Cmd+Shift+I` | Open in IDE |
 | `Cmd+Shift+P` | Permission settings |
 | `Cmd+Shift+F` | Show in Finder |
 | `Cmd+Shift+C` | Copy path |
@@ -78,6 +84,7 @@ All presets include deny rules for dangerous operations (`rm -rf`, `sudo`, `git 
 | Favorites First | Show favorited projects at the top | Enabled |
 | Language | Interface language (English/中文) | English |
 | Default Permission Preset | Auto-apply to new projects | None |
+| IDE App | IDE for opening projects (VS Code, Cursor, Zed, WebStorm) | None |
 
 ## How It Works
 
@@ -87,7 +94,7 @@ This extension reads Claude Code's project data from `~/.claude/projects/` direc
 
 - [Raycast](https://raycast.com)
 - [Claude Code](https://claude.ai/code) installed and used at least once
-- A supported terminal app (iTerm, Terminal, Warp, Alacritty, or Kitty)
+- A supported terminal app (iTerm, Terminal, Warp, Alacritty, Kitty, or Ghostty)
 
 ## Contributing
 

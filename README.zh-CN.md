@@ -7,11 +7,15 @@
 ## 功能特性
 
 - **快速访问** - 一键浏览和打开最近的 Claude Code 项目
-- **多终端支持** - 支持 iTerm、Terminal.app、Warp、Alacritty 和 Kitty
+- **多终端支持** - 支持 iTerm、Terminal.app、Warp、Alacritty、Kitty 和 Ghostty
 - **收藏功能** - 将常用项目置顶显示
 - **时间分组** - 按今天、本周、更早分组显示项目
 - **快捷键** - `Cmd+1/2/3` 快速打开前 3 个项目
 - **权限管理** - 按项目设置 Claude Code 权限预设，内置可视化规则编辑器
+- **IDE 集成** - 直接在 VS Code、Cursor、Zed 或 WebStorm 中打开项目
+- **会话选择** - 浏览并恢复特定会话，不仅限于最近一次
+- **项目清理** - 一键清理无效的项目条目
+- **批量权限** - 一次性对所有项目应用权限预设
 - **双语界面** - 支持中英文切换
 
 ## 安装方法
@@ -63,6 +67,8 @@ npm run build
 | `Cmd+N` | 新建会话 (`claude`) |
 | `Cmd+D` | 收藏/取消收藏 |
 | `Cmd+1/2/3` | 快速打开前 3 个项目 |
+| `Cmd+Shift+S` | 选择会话恢复 |
+| `Cmd+Shift+I` | 在 IDE 中打开 |
 | `Cmd+Shift+P` | 权限设置 |
 | `Cmd+Shift+F` | 在 Finder 中显示 |
 | `Cmd+Shift+C` | 复制路径 |
@@ -78,6 +84,7 @@ npm run build
 | 收藏优先 | 将收藏的项目显示在顶部 | 开启 |
 | 语言 | 界面语言（English/中文） | English |
 | 默认权限预设 | 自动应用到新项目 | 无 |
+| IDE 应用 | 用于打开项目的 IDE（VS Code、Cursor、Zed、WebStorm） | 无 |
 
 ## 工作原理
 
@@ -87,4 +94,4 @@ npm run build
 
 - [Raycast](https://raycast.com)
 - [Claude Code](https://claude.ai/code) 已安装并至少使用过一次
-- 支持的终端应用（iTerm、Terminal、Warp、Alacritty 或 Kitty）
+- 支持的终端应用（iTerm、Terminal、Warp、Alacritty、Kitty 或 Ghostty）

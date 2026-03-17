@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.2.0] - 2026-03-17
+
+### Added
+- Ghostty terminal support
+- IDE integration: open projects in VS Code, Cursor, Zed, or WebStorm (`Cmd+Shift+I`)
+- Session picker: browse and resume specific sessions (`Cmd+Shift+S`)
+- Stale project cleanup with confirmation dialog
+- Batch permission apply across all projects
+- Path-based search in project list
+
+### Fixed
+- Missing credentials/secret deny rules in presets
+- Session ID command injection vulnerability
+- Default terminal case using unescaped AppleScript string
+- Kitty terminal not injecting API environment variables
+- Hardcoded English "(latest)" label in session picker
+
+### Improved
+- Extracted `shellEscape()` helper to deduplicate shell escaping logic
+- Pre-computed preset comparison data for faster detection
+- Converted favorites to Set for O(1) lookup
+- Unified preset action blocks with `.map()` to reduce duplication
+- Added `TerminalApp` union type for type-safe terminal handling
+
 ## [1.1.0] - 2026-03-16
 
 ### Added
