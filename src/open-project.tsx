@@ -979,26 +979,37 @@ const PRESET_SORTED_CACHE = Object.fromEntries(
   ]),
 );
 
+function isSubset(subset: string[], superset: string[]): boolean {
+  const superSet = new Set(superset);
+  return subset.every((item) => superSet.has(item));
+}
+
 function detectPreset(projectPath: string): PermissionPreset {
   const settingsPath = getSettingsPath(projectPath);
   if (!fs.existsSync(settingsPath)) return "default";
   try {
     const content = fs.readFileSync(settingsPath, "utf-8");
     const settings = JSON.parse(content);
-    const allow = settings.permissions?.allow || [];
-    const deny = settings.permissions?.deny || [];
+    const allow: string[] = settings.permissions?.allow || [];
+    const deny: string[] = settings.permissions?.deny || [];
     const mode = settings.defaultMode;
     if (allow.length === 0 && deny.length === 0 && !mode) return "default";
     const allowJson = sortedJson(allow);
-    const denyJson = sortedJson(deny);
     for (const [name, preset] of Object.entries(PERMISSION_PRESETS)) {
       const cached = PRESET_SORTED_CACHE[name];
-      if (
-        allowJson === cached.allow &&
-        denyJson === cached.deny &&
-        mode === preset.defaultMode
-      ) {
-        return name as PermissionPreset;
+      if (allowJson === cached.allow && mode === preset.defaultMode) {
+        if (sortedJson(deny) === cached.deny) {
+          return name as PermissionPreset;
+        }
+        // Auto-upgrade: deny is a subset of the preset's deny (missing new rules)
+        if (isSubset(deny, preset.deny)) {
+          settings.permissions.deny = preset.deny;
+          fs.writeFileSync(
+            settingsPath,
+            JSON.stringify(settings, null, 2) + "\n",
+          );
+          return name as PermissionPreset;
+        }
       }
     }
     return "custom";
