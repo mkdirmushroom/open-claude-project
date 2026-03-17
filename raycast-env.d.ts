@@ -9,7 +9,7 @@
 
 type ExtensionPreferences = {
   /** Terminal App - Choose which terminal to use */
-  "terminal": "iterm" | "terminal" | "warp" | "alacritty" | "kitty",
+  "terminal": "iterm" | "terminal" | "warp" | "alacritty" | "kitty" | "ghostty",
   /** Group by Time - Group projects by time (Today, This Week, Earlier) */
   "groupByTime": boolean,
   /** Favorites First - Always show favorited projects at the top */
@@ -18,6 +18,8 @@ type ExtensionPreferences = {
   "language": "zh" | "en",
   /** Default Permission Preset - Auto-apply this preset to new projects without permissions */
   "defaultPreset": "" | "strict" | "standard" | "permissive",
+  /** IDE App - Choose which IDE to open projects in (adds an action to the list) */
+  "ideApp": "" | "code" | "cursor" | "zed" | "webstorm",
   /** Anthropic Base URL - Custom API base URL (e.g., https://api.kimi.com/coding/) - Optional */
   "anthropicBaseUrl"?: string,
   /** Anthropic API Key - Custom API key - Optional (will be injected as ANTHROPIC_API_KEY) */

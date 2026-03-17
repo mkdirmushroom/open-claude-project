@@ -31,10 +31,15 @@ const MS_PER_DAY = 86400000;
 const DAYS_IN_WEEK = 7;
 
 const DENY_DANGEROUS = [
-  "Bash(rm -rf *)", "Bash(sudo *)",
-  "Bash(git push --force*)", "Bash(git reset --hard*)",
-  "Read(**/.env)", "Read(**/.env.*)",
-  "Read(**/*.pem)", "Read(**/*.key)", "Read(**/*_rsa)",
+  "Bash(rm -rf *)",
+  "Bash(sudo *)",
+  "Bash(git push --force*)",
+  "Bash(git reset --hard*)",
+  "Read(**/.env)",
+  "Read(**/.env.*)",
+  "Read(**/*.pem)",
+  "Read(**/*.key)",
+  "Read(**/*_rsa)",
 ];
 
 interface PresetConfig {
@@ -51,17 +56,34 @@ const PERMISSION_PRESETS: Record<string, PresetConfig> = {
   standard: {
     defaultMode: "acceptEdits",
     allow: [
-      "Bash(echo:*)", "Bash(gh:*)", "Bash(git:*)", "Bash(ls:*)",
-      "Bash(node:*)", "Bash(npm:*)", "Bash(npx:*)", "Bash(tree:*)",
-      "Edit", "Glob", "Grep", "Read", "WebSearch", "Write",
+      "Bash(echo:*)",
+      "Bash(gh:*)",
+      "Bash(git:*)",
+      "Bash(ls:*)",
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(tree:*)",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Read",
+      "WebSearch",
+      "Write",
     ],
     deny: DENY_DANGEROUS,
   },
   permissive: {
     defaultMode: "acceptEdits",
     allow: [
-      "Bash", "Edit", "Glob", "Grep",
-      "Read", "WebFetch", "WebSearch", "Write",
+      "Bash",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Read",
+      "WebFetch",
+      "WebSearch",
+      "Write",
     ],
     deny: DENY_DANGEROUS,
   },
@@ -87,77 +109,429 @@ const CATALOG_SECTIONS = [
 ];
 
 const MODE_OPTIONS = [
-  { value: "default", zh: "默认 — 每次操作都需确认", en: "Default — confirm every operation" },
-  { value: "acceptEdits", zh: "自动接受编辑 — 文件编辑自动通过", en: "Auto-accept edits — file changes auto-approved" },
-  { value: "plan", zh: "计划模式 — 只分析不修改", en: "Plan mode — analyze only, no changes" },
-  { value: "bypassPermissions", zh: "跳过权限 — 仅限容器/VM", en: "Bypass — containers/VMs only" },
+  {
+    value: "default",
+    zh: "默认 — 每次操作都需确认",
+    en: "Default — confirm every operation",
+  },
+  {
+    value: "acceptEdits",
+    zh: "自动接受编辑 — 文件编辑自动通过",
+    en: "Auto-accept edits — file changes auto-approved",
+  },
+  {
+    value: "plan",
+    zh: "计划模式 — 只分析不修改",
+    en: "Plan mode — analyze only, no changes",
+  },
+  {
+    value: "bypassPermissions",
+    zh: "跳过权限 — 仅限容器/VM",
+    en: "Bypass — containers/VMs only",
+  },
 ];
 
 const PERMISSION_CATALOG: CatalogRule[] = [
   // File Operations
-  { pattern: "Read", type: "allow", section: "fileOps", zh: "读取文件", en: "Read files" },
-  { pattern: "Write", type: "allow", section: "fileOps", zh: "写入文件", en: "Write files" },
-  { pattern: "Edit", type: "allow", section: "fileOps", zh: "编辑文件", en: "Edit files" },
-  { pattern: "Glob", type: "allow", section: "fileOps", zh: "按模式搜索文件", en: "Search files by pattern" },
-  { pattern: "Grep", type: "allow", section: "fileOps", zh: "搜索文件内容", en: "Search file contents" },
-  { pattern: "NotebookEdit", type: "allow", section: "fileOps", zh: "编辑 Jupyter Notebook", en: "Edit Jupyter Notebooks" },
+  {
+    pattern: "Read",
+    type: "allow",
+    section: "fileOps",
+    zh: "读取文件",
+    en: "Read files",
+  },
+  {
+    pattern: "Write",
+    type: "allow",
+    section: "fileOps",
+    zh: "写入文件",
+    en: "Write files",
+  },
+  {
+    pattern: "Edit",
+    type: "allow",
+    section: "fileOps",
+    zh: "编辑文件",
+    en: "Edit files",
+  },
+  {
+    pattern: "Glob",
+    type: "allow",
+    section: "fileOps",
+    zh: "按模式搜索文件",
+    en: "Search files by pattern",
+  },
+  {
+    pattern: "Grep",
+    type: "allow",
+    section: "fileOps",
+    zh: "搜索文件内容",
+    en: "Search file contents",
+  },
+  {
+    pattern: "NotebookEdit",
+    type: "allow",
+    section: "fileOps",
+    zh: "编辑 Jupyter Notebook",
+    en: "Edit Jupyter Notebooks",
+  },
   // Version Control
-  { pattern: "Bash(git:*)", type: "allow", section: "vcs", zh: "Git 操作", en: "Git operations" },
-  { pattern: "Bash(gh:*)", type: "allow", section: "vcs", zh: "GitHub CLI", en: "GitHub CLI" },
+  {
+    pattern: "Bash(git:*)",
+    type: "allow",
+    section: "vcs",
+    zh: "Git 操作",
+    en: "Git operations",
+  },
+  {
+    pattern: "Bash(gh:*)",
+    type: "allow",
+    section: "vcs",
+    zh: "GitHub CLI",
+    en: "GitHub CLI",
+  },
   // Package Management
-  { pattern: "Bash(npm:*)", type: "allow", section: "pkgMgmt", zh: "npm 命令", en: "npm commands" },
-  { pattern: "Bash(npx:*)", type: "allow", section: "pkgMgmt", zh: "npx 执行", en: "npx execution" },
-  { pattern: "Bash(yarn:*)", type: "allow", section: "pkgMgmt", zh: "Yarn 命令", en: "Yarn commands" },
-  { pattern: "Bash(pnpm:*)", type: "allow", section: "pkgMgmt", zh: "pnpm 命令", en: "pnpm commands" },
-  { pattern: "Bash(bun:*)", type: "allow", section: "pkgMgmt", zh: "Bun 命令", en: "Bun commands" },
-  { pattern: "Bash(pip:*)", type: "allow", section: "pkgMgmt", zh: "pip 包管理", en: "pip packages" },
-  { pattern: "Bash(uv:*)", type: "allow", section: "pkgMgmt", zh: "uv (Python)", en: "uv (Python)" },
-  { pattern: "Bash(cargo:*)", type: "allow", section: "pkgMgmt", zh: "Cargo (Rust)", en: "Cargo (Rust)" },
-  { pattern: "Bash(brew:*)", type: "allow", section: "pkgMgmt", zh: "Homebrew", en: "Homebrew" },
+  {
+    pattern: "Bash(npm:*)",
+    type: "allow",
+    section: "pkgMgmt",
+    zh: "npm 命令",
+    en: "npm commands",
+  },
+  {
+    pattern: "Bash(npx:*)",
+    type: "allow",
+    section: "pkgMgmt",
+    zh: "npx 执行",
+    en: "npx execution",
+  },
+  {
+    pattern: "Bash(yarn:*)",
+    type: "allow",
+    section: "pkgMgmt",
+    zh: "Yarn 命令",
+    en: "Yarn commands",
+  },
+  {
+    pattern: "Bash(pnpm:*)",
+    type: "allow",
+    section: "pkgMgmt",
+    zh: "pnpm 命令",
+    en: "pnpm commands",
+  },
+  {
+    pattern: "Bash(bun:*)",
+    type: "allow",
+    section: "pkgMgmt",
+    zh: "Bun 命令",
+    en: "Bun commands",
+  },
+  {
+    pattern: "Bash(pip:*)",
+    type: "allow",
+    section: "pkgMgmt",
+    zh: "pip 包管理",
+    en: "pip packages",
+  },
+  {
+    pattern: "Bash(uv:*)",
+    type: "allow",
+    section: "pkgMgmt",
+    zh: "uv (Python)",
+    en: "uv (Python)",
+  },
+  {
+    pattern: "Bash(cargo:*)",
+    type: "allow",
+    section: "pkgMgmt",
+    zh: "Cargo (Rust)",
+    en: "Cargo (Rust)",
+  },
+  {
+    pattern: "Bash(brew:*)",
+    type: "allow",
+    section: "pkgMgmt",
+    zh: "Homebrew",
+    en: "Homebrew",
+  },
   // Runtimes
-  { pattern: "Bash(node:*)", type: "allow", section: "runtime", zh: "Node.js", en: "Node.js" },
-  { pattern: "Bash(python:*)", type: "allow", section: "runtime", zh: "Python", en: "Python" },
-  { pattern: "Bash(python3:*)", type: "allow", section: "runtime", zh: "Python 3", en: "Python 3" },
-  { pattern: "Bash(swift:*)", type: "allow", section: "runtime", zh: "Swift", en: "Swift" },
-  { pattern: "Bash(go:*)", type: "allow", section: "runtime", zh: "Go", en: "Go" },
-  { pattern: "Bash(ruby:*)", type: "allow", section: "runtime", zh: "Ruby", en: "Ruby" },
-  { pattern: "Bash(java:*)", type: "allow", section: "runtime", zh: "Java", en: "Java" },
-  { pattern: "Bash(javac:*)", type: "allow", section: "runtime", zh: "Java 编译器", en: "Java compiler" },
+  {
+    pattern: "Bash(node:*)",
+    type: "allow",
+    section: "runtime",
+    zh: "Node.js",
+    en: "Node.js",
+  },
+  {
+    pattern: "Bash(python:*)",
+    type: "allow",
+    section: "runtime",
+    zh: "Python",
+    en: "Python",
+  },
+  {
+    pattern: "Bash(python3:*)",
+    type: "allow",
+    section: "runtime",
+    zh: "Python 3",
+    en: "Python 3",
+  },
+  {
+    pattern: "Bash(swift:*)",
+    type: "allow",
+    section: "runtime",
+    zh: "Swift",
+    en: "Swift",
+  },
+  {
+    pattern: "Bash(go:*)",
+    type: "allow",
+    section: "runtime",
+    zh: "Go",
+    en: "Go",
+  },
+  {
+    pattern: "Bash(ruby:*)",
+    type: "allow",
+    section: "runtime",
+    zh: "Ruby",
+    en: "Ruby",
+  },
+  {
+    pattern: "Bash(java:*)",
+    type: "allow",
+    section: "runtime",
+    zh: "Java",
+    en: "Java",
+  },
+  {
+    pattern: "Bash(javac:*)",
+    type: "allow",
+    section: "runtime",
+    zh: "Java 编译器",
+    en: "Java compiler",
+  },
   // System Tools
-  { pattern: "Bash(ls:*)", type: "allow", section: "system", zh: "列出目录", en: "List directory" },
-  { pattern: "Bash(tree:*)", type: "allow", section: "system", zh: "目录树", en: "Directory tree" },
-  { pattern: "Bash(echo:*)", type: "allow", section: "system", zh: "echo 输出", en: "Echo output" },
-  { pattern: "Bash(cat:*)", type: "allow", section: "system", zh: "查看文件内容", en: "View file content" },
-  { pattern: "Bash(head:*)", type: "allow", section: "system", zh: "查看文件头部", en: "View file head" },
-  { pattern: "Bash(tail:*)", type: "allow", section: "system", zh: "查看文件尾部", en: "View file tail" },
-  { pattern: "Bash(wc:*)", type: "allow", section: "system", zh: "统计字数/行数", en: "Word/line count" },
-  { pattern: "Bash(which:*)", type: "allow", section: "system", zh: "查找命令路径", en: "Find command path" },
-  { pattern: "Bash(diff:*)", type: "allow", section: "system", zh: "文件差异比较", en: "File diff" },
-  { pattern: "Bash(mkdir:*)", type: "allow", section: "system", zh: "创建目录", en: "Create directory" },
-  { pattern: "Bash(cp:*)", type: "allow", section: "system", zh: "复制文件", en: "Copy files" },
-  { pattern: "Bash(mv:*)", type: "allow", section: "system", zh: "移动/重命名文件", en: "Move/rename files" },
-  { pattern: "Bash(date:*)", type: "allow", section: "system", zh: "日期时间", en: "Date/time" },
-  { pattern: "Bash(make:*)", type: "allow", section: "system", zh: "Make 构建", en: "Make build" },
-  { pattern: "Bash(docker:*)", type: "allow", section: "system", zh: "Docker 容器", en: "Docker containers" },
-  { pattern: "Bash(kubectl:*)", type: "allow", section: "system", zh: "Kubernetes CLI", en: "Kubernetes CLI" },
-  { pattern: "Bash(curl:*)", type: "allow", section: "system", zh: "cURL 请求", en: "cURL requests" },
+  {
+    pattern: "Bash(ls:*)",
+    type: "allow",
+    section: "system",
+    zh: "列出目录",
+    en: "List directory",
+  },
+  {
+    pattern: "Bash(tree:*)",
+    type: "allow",
+    section: "system",
+    zh: "目录树",
+    en: "Directory tree",
+  },
+  {
+    pattern: "Bash(echo:*)",
+    type: "allow",
+    section: "system",
+    zh: "echo 输出",
+    en: "Echo output",
+  },
+  {
+    pattern: "Bash(cat:*)",
+    type: "allow",
+    section: "system",
+    zh: "查看文件内容",
+    en: "View file content",
+  },
+  {
+    pattern: "Bash(head:*)",
+    type: "allow",
+    section: "system",
+    zh: "查看文件头部",
+    en: "View file head",
+  },
+  {
+    pattern: "Bash(tail:*)",
+    type: "allow",
+    section: "system",
+    zh: "查看文件尾部",
+    en: "View file tail",
+  },
+  {
+    pattern: "Bash(wc:*)",
+    type: "allow",
+    section: "system",
+    zh: "统计字数/行数",
+    en: "Word/line count",
+  },
+  {
+    pattern: "Bash(which:*)",
+    type: "allow",
+    section: "system",
+    zh: "查找命令路径",
+    en: "Find command path",
+  },
+  {
+    pattern: "Bash(diff:*)",
+    type: "allow",
+    section: "system",
+    zh: "文件差异比较",
+    en: "File diff",
+  },
+  {
+    pattern: "Bash(mkdir:*)",
+    type: "allow",
+    section: "system",
+    zh: "创建目录",
+    en: "Create directory",
+  },
+  {
+    pattern: "Bash(cp:*)",
+    type: "allow",
+    section: "system",
+    zh: "复制文件",
+    en: "Copy files",
+  },
+  {
+    pattern: "Bash(mv:*)",
+    type: "allow",
+    section: "system",
+    zh: "移动/重命名文件",
+    en: "Move/rename files",
+  },
+  {
+    pattern: "Bash(date:*)",
+    type: "allow",
+    section: "system",
+    zh: "日期时间",
+    en: "Date/time",
+  },
+  {
+    pattern: "Bash(make:*)",
+    type: "allow",
+    section: "system",
+    zh: "Make 构建",
+    en: "Make build",
+  },
+  {
+    pattern: "Bash(docker:*)",
+    type: "allow",
+    section: "system",
+    zh: "Docker 容器",
+    en: "Docker containers",
+  },
+  {
+    pattern: "Bash(kubectl:*)",
+    type: "allow",
+    section: "system",
+    zh: "Kubernetes CLI",
+    en: "Kubernetes CLI",
+  },
+  {
+    pattern: "Bash(curl:*)",
+    type: "allow",
+    section: "system",
+    zh: "cURL 请求",
+    en: "cURL requests",
+  },
   // All Bash
-  { pattern: "Bash", type: "allow", section: "bashAll", zh: "全部 Bash 命令", en: "All Bash commands" },
+  {
+    pattern: "Bash",
+    type: "allow",
+    section: "bashAll",
+    zh: "全部 Bash 命令",
+    en: "All Bash commands",
+  },
   // Network
-  { pattern: "WebSearch", type: "allow", section: "network", zh: "网络搜索", en: "Web search" },
-  { pattern: "WebFetch", type: "allow", section: "network", zh: "网络请求", en: "Web fetch" },
+  {
+    pattern: "WebSearch",
+    type: "allow",
+    section: "network",
+    zh: "网络搜索",
+    en: "Web search",
+  },
+  {
+    pattern: "WebFetch",
+    type: "allow",
+    section: "network",
+    zh: "网络请求",
+    en: "Web fetch",
+  },
   // Safety (Deny)
-  { pattern: "Bash(rm -rf *)", type: "deny", section: "safety", zh: "禁止递归删除", en: "Block recursive delete" },
-  { pattern: "Bash(sudo *)", type: "deny", section: "safety", zh: "禁止 sudo 提权", en: "Block sudo" },
-  { pattern: "Bash(git push --force*)", type: "deny", section: "safety", zh: "禁止强制推送", en: "Block force push" },
-  { pattern: "Bash(git reset --hard*)", type: "deny", section: "safety", zh: "禁止硬重置", en: "Block hard reset" },
-  { pattern: "Read(**/.env)", type: "deny", section: "safety", zh: "禁止读取 .env", en: "Block reading .env" },
-  { pattern: "Read(**/.env.*)", type: "deny", section: "safety", zh: "禁止读取 .env.*", en: "Block reading .env.*" },
-  { pattern: "Read(**/*.pem)", type: "deny", section: "safety", zh: "禁止读取证书", en: "Block reading certs" },
-  { pattern: "Read(**/*.key)", type: "deny", section: "safety", zh: "禁止读取私钥", en: "Block reading keys" },
-  { pattern: "Read(**/*_rsa)", type: "deny", section: "safety", zh: "禁止读取 RSA 密钥", en: "Block reading RSA keys" },
-  { pattern: "Read(**/*credentials*)", type: "deny", section: "safety", zh: "禁止读取凭证文件", en: "Block reading credentials" },
-  { pattern: "Read(**/*secret*)", type: "deny", section: "safety", zh: "禁止读取密钥文件", en: "Block reading secrets" },
+  {
+    pattern: "Bash(rm -rf *)",
+    type: "deny",
+    section: "safety",
+    zh: "禁止递归删除",
+    en: "Block recursive delete",
+  },
+  {
+    pattern: "Bash(sudo *)",
+    type: "deny",
+    section: "safety",
+    zh: "禁止 sudo 提权",
+    en: "Block sudo",
+  },
+  {
+    pattern: "Bash(git push --force*)",
+    type: "deny",
+    section: "safety",
+    zh: "禁止强制推送",
+    en: "Block force push",
+  },
+  {
+    pattern: "Bash(git reset --hard*)",
+    type: "deny",
+    section: "safety",
+    zh: "禁止硬重置",
+    en: "Block hard reset",
+  },
+  {
+    pattern: "Read(**/.env)",
+    type: "deny",
+    section: "safety",
+    zh: "禁止读取 .env",
+    en: "Block reading .env",
+  },
+  {
+    pattern: "Read(**/.env.*)",
+    type: "deny",
+    section: "safety",
+    zh: "禁止读取 .env.*",
+    en: "Block reading .env.*",
+  },
+  {
+    pattern: "Read(**/*.pem)",
+    type: "deny",
+    section: "safety",
+    zh: "禁止读取证书",
+    en: "Block reading certs",
+  },
+  {
+    pattern: "Read(**/*.key)",
+    type: "deny",
+    section: "safety",
+    zh: "禁止读取私钥",
+    en: "Block reading keys",
+  },
+  {
+    pattern: "Read(**/*_rsa)",
+    type: "deny",
+    section: "safety",
+    zh: "禁止读取 RSA 密钥",
+    en: "Block reading RSA keys",
+  },
+  {
+    pattern: "Read(**/*credentials*)",
+    type: "deny",
+    section: "safety",
+    zh: "禁止读取凭证文件",
+    en: "Block reading credentials",
+  },
+  {
+    pattern: "Read(**/*secret*)",
+    type: "deny",
+    section: "safety",
+    zh: "禁止读取密钥文件",
+    en: "Block reading secrets",
+  },
 ];
 
 // ============================================================================
@@ -235,6 +609,22 @@ const i18n = {
     permRuleDeleted: "规则已删除",
     permRulePlaceholder: "例如: Bash(command:*)",
     permRuleExists: "规则已存在",
+    // IDE
+    openInIde: "在 IDE 中打开",
+    // Session
+    selectSession: "选择会话",
+    resumeSession: "恢复会话",
+    noSessions: "没有可用的会话",
+    noSessionsDesc: "此项目暂无会话记录",
+    sessionId: "会话 ID",
+    // Cleanup
+    cleanupStale: "清理无效项目",
+    cleanupDone: (n: number) => `已清理 ${n} 个无效项目`,
+    cleanupNone: "没有需要清理的项目",
+    cleanupConfirm: "确定要清理无效项目吗？",
+    // Batch
+    batchApply: "批量应用权限",
+    batchApplyDone: (n: number) => `已应用到 ${n} 个项目`,
   },
   en: {
     // Time
@@ -306,6 +696,23 @@ const i18n = {
     permRuleDeleted: "Rule deleted",
     permRulePlaceholder: "e.g. Bash(command:*)",
     permRuleExists: "Rule already exists",
+    // IDE
+    openInIde: "Open in IDE",
+    // Session
+    selectSession: "Select Session",
+    resumeSession: "Resume Session",
+    noSessions: "No Sessions Available",
+    noSessionsDesc: "No session history for this project",
+    sessionId: "Session ID",
+    // Cleanup
+    cleanupStale: "Clean Up Stale Projects",
+    cleanupDone: (n: number) =>
+      `Cleaned up ${n} stale project${n > 1 ? "s" : ""}`,
+    cleanupNone: "No stale projects found",
+    cleanupConfirm: "Clean up stale projects?",
+    // Batch
+    batchApply: "Batch Apply Permissions",
+    batchApplyDone: (n: number) => `Applied to ${n} project${n > 1 ? "s" : ""}`,
   },
 };
 
@@ -317,11 +724,12 @@ type I18nStrings = typeof i18n.zh;
 // ============================================================================
 
 interface Preferences {
-  terminal: "iterm" | "terminal" | "warp" | "alacritty" | "kitty";
+  terminal: "iterm" | "terminal" | "warp" | "alacritty" | "kitty" | "ghostty";
   groupByTime: boolean;
   showFavoritesFirst: boolean;
   language: Language;
   defaultPreset?: "" | "strict" | "standard" | "permissive";
+  ideApp?: "" | "code" | "cursor" | "zed" | "webstorm";
   anthropicBaseUrl?: string;
   anthropicApiKey?: string;
 }
@@ -336,7 +744,12 @@ interface ClaudeProject {
 }
 
 type TimeGroup = "favorites" | "today" | "thisWeek" | "earlier";
-type PermissionPreset = "strict" | "standard" | "permissive" | "custom" | "default";
+type PermissionPreset =
+  | "strict"
+  | "standard"
+  | "permissive"
+  | "custom"
+  | "default";
 
 // ============================================================================
 // Data Loading Functions
@@ -422,7 +835,9 @@ function getProjectPathAndFiles(
   return { path: null, sessionFiles: files };
 }
 
-async function loadClaudeProjects(defaultPreset?: string): Promise<ClaudeProject[]> {
+async function loadClaudeProjects(
+  defaultPreset?: string,
+): Promise<ClaudeProject[]> {
   const claudeProjectsDir = path.join(os.homedir(), ".claude", "projects");
 
   if (!fs.existsSync(claudeProjectsDir)) {
@@ -458,7 +873,11 @@ async function loadClaudeProjects(defaultPreset?: string): Promise<ClaudeProject
     }
 
     let preset = detectPreset(fullPath);
-    if (preset === "default" && defaultPreset && defaultPreset in PERMISSION_PRESETS) {
+    if (
+      preset === "default" &&
+      defaultPreset &&
+      defaultPreset in PERMISSION_PRESETS
+    ) {
       writePermissionPreset(fullPath, defaultPreset);
       preset = defaultPreset as PermissionPreset;
     }
@@ -615,7 +1034,10 @@ function getPresetDisplay(
   }
 }
 
-function saveSettings(projectPath: string, settings: Record<string, unknown>): void {
+function saveSettings(
+  projectPath: string,
+  settings: Record<string, unknown>,
+): void {
   const claudeDir = path.join(projectPath, ".claude");
   const settingsPath = path.join(claudeDir, "settings.local.json");
   if (!fs.existsSync(claudeDir)) {
@@ -625,7 +1047,8 @@ function saveSettings(projectPath: string, settings: Record<string, unknown>): v
   const clean = JSON.parse(JSON.stringify(settings)) as Record<string, unknown>;
   const perms = clean.permissions as Record<string, unknown> | undefined;
   if (perms) {
-    if (Array.isArray(perms.allow) && perms.allow.length === 0) delete perms.allow;
+    if (Array.isArray(perms.allow) && perms.allow.length === 0)
+      delete perms.allow;
     if (Array.isArray(perms.deny) && perms.deny.length === 0) delete perms.deny;
     if (Object.keys(perms).length === 0) delete clean.permissions;
   }
@@ -725,8 +1148,12 @@ function PermissionEditor({
 
   // Find rules not in the catalog
   const customRules = [
-    ...allow.filter((p) => !CATALOG_ALLOW_PATTERNS.has(p)).map((p) => ({ pattern: p, type: "allow" as const })),
-    ...deny.filter((p) => !CATALOG_DENY_PATTERNS.has(p)).map((p) => ({ pattern: p, type: "deny" as const })),
+    ...allow
+      .filter((p) => !CATALOG_ALLOW_PATTERNS.has(p))
+      .map((p) => ({ pattern: p, type: "allow" as const })),
+    ...deny
+      .filter((p) => !CATALOG_DENY_PATTERNS.has(p))
+      .map((p) => ({ pattern: p, type: "deny" as const })),
   ];
 
   const update = (newSettings: Record<string, unknown>) => {
@@ -751,7 +1178,11 @@ function PermissionEditor({
       return;
     }
     toggleRule(pattern, type);
-    showToast({ style: Toast.Style.Success, title: t.permRuleAdded, message: pattern });
+    showToast({
+      style: Toast.Style.Success,
+      title: t.permRuleAdded,
+      message: pattern,
+    });
   };
 
   const setMode = (value: string) => {
@@ -783,7 +1214,9 @@ function PermissionEditor({
   );
 
   return (
-    <List navigationTitle={`${t.permCustomEdit} — ${path.basename(projectPath)}`}>
+    <List
+      navigationTitle={`${t.permCustomEdit} — ${path.basename(projectPath)}`}
+    >
       <List.Section title={t.permSectionMode}>
         {MODE_OPTIONS.map((option) => (
           <List.Item
@@ -797,9 +1230,15 @@ function PermissionEditor({
             actions={
               <ActionPanel>
                 <Action
-                  title={currentMode === option.value ? t.permDisable : t.permEnable}
+                  title={
+                    currentMode === option.value ? t.permDisable : t.permEnable
+                  }
                   icon={Icon.Switch}
-                  onAction={() => setMode(currentMode === option.value ? "default" : option.value)}
+                  onAction={() =>
+                    setMode(
+                      currentMode === option.value ? "default" : option.value,
+                    )
+                  }
                 />
                 {commonActions}
               </ActionPanel>
@@ -813,7 +1252,10 @@ function PermissionEditor({
             <List.Item
               key={`custom-${rule.type}-${rule.pattern}`}
               title={rule.pattern}
-              icon={{ source: Icon.CheckCircle, tintColor: rule.type === "allow" ? Color.Green : Color.Red }}
+              icon={{
+                source: Icon.CheckCircle,
+                tintColor: rule.type === "allow" ? Color.Green : Color.Red,
+              }}
               accessories={[
                 {
                   tag: {
@@ -830,7 +1272,11 @@ function PermissionEditor({
                     style={Action.Style.Destructive}
                     onAction={() => {
                       toggleRule(rule.pattern, rule.type);
-                      showToast({ style: Toast.Style.Success, title: t.permRuleDeleted, message: rule.pattern });
+                      showToast({
+                        style: Toast.Style.Success,
+                        title: t.permRuleDeleted,
+                        message: rule.pattern,
+                      });
                     }}
                   />
                   {commonActions}
@@ -841,42 +1287,129 @@ function PermissionEditor({
         </List.Section>
       )}
       {CATALOG_SECTIONS.map((section) => (
-        <List.Section key={section.key} title={lang === "zh" ? section.zh : section.en}>
-          {PERMISSION_CATALOG.filter((r) => r.section === section.key).map((rule) => {
-            const list = rule.type === "allow" ? allow : deny;
-            const enabled = list.includes(rule.pattern);
-            return (
-              <List.Item
-                key={`${rule.type}-${rule.pattern}`}
-                title={rule.pattern}
-                subtitle={lang === "zh" ? rule.zh : rule.en}
-                icon={
-                  enabled
-                    ? { source: Icon.CheckCircle, tintColor: rule.type === "allow" ? Color.Green : Color.Red }
-                    : Icon.Circle
-                }
-                accessories={[
-                  {
-                    tag: {
-                      value: rule.type === "allow" ? "Allow" : "Deny",
-                      color: rule.type === "allow" ? Color.Green : Color.Red,
+        <List.Section
+          key={section.key}
+          title={lang === "zh" ? section.zh : section.en}
+        >
+          {PERMISSION_CATALOG.filter((r) => r.section === section.key).map(
+            (rule) => {
+              const list = rule.type === "allow" ? allow : deny;
+              const enabled = list.includes(rule.pattern);
+              return (
+                <List.Item
+                  key={`${rule.type}-${rule.pattern}`}
+                  title={rule.pattern}
+                  subtitle={lang === "zh" ? rule.zh : rule.en}
+                  icon={
+                    enabled
+                      ? {
+                          source: Icon.CheckCircle,
+                          tintColor:
+                            rule.type === "allow" ? Color.Green : Color.Red,
+                        }
+                      : Icon.Circle
+                  }
+                  accessories={[
+                    {
+                      tag: {
+                        value: rule.type === "allow" ? "Allow" : "Deny",
+                        color: rule.type === "allow" ? Color.Green : Color.Red,
+                      },
                     },
-                  },
-                ]}
-                actions={
-                  <ActionPanel>
-                    <Action
-                      title={enabled ? t.permDisable : t.permEnable}
-                      icon={enabled ? Icon.Circle : Icon.CheckCircle}
-                      onAction={() => toggleRule(rule.pattern, rule.type)}
-                    />
-                    {commonActions}
-                  </ActionPanel>
+                  ]}
+                  actions={
+                    <ActionPanel>
+                      <Action
+                        title={enabled ? t.permDisable : t.permEnable}
+                        icon={enabled ? Icon.Circle : Icon.CheckCircle}
+                        onAction={() => toggleRule(rule.pattern, rule.type)}
+                      />
+                      {commonActions}
+                    </ActionPanel>
+                  }
+                />
+              );
+            },
+          )}
+        </List.Section>
+      ))}
+    </List>
+  );
+}
+
+// ============================================================================
+// Session Picker Component
+// ============================================================================
+
+function SessionPicker({
+  project,
+  lang,
+  terminal,
+  anthropicBaseUrl,
+  anthropicApiKey,
+}: {
+  project: ClaudeProject;
+  lang: Language;
+  terminal: string;
+  anthropicBaseUrl?: string;
+  anthropicApiKey?: string;
+}) {
+  const t = i18n[lang];
+  const sessions = getProjectSessions(project.encodedName);
+
+  if (sessions.length === 0) {
+    return (
+      <List navigationTitle={t.selectSession}>
+        <List.EmptyView
+          title={t.noSessions}
+          description={t.noSessionsDesc}
+          icon={Icon.Document}
+        />
+      </List>
+    );
+  }
+
+  return (
+    <List navigationTitle={`${t.selectSession} — ${project.name}`}>
+      {sessions.map((session, idx) => (
+        <List.Item
+          key={session.id}
+          title={
+            idx === 0
+              ? `${formatRelativeTime(session.mtime, t)} (latest)`
+              : formatRelativeTime(session.mtime, t)
+          }
+          subtitle={session.id.substring(0, 8)}
+          icon={
+            idx === 0
+              ? { source: Icon.Clock, tintColor: Color.Green }
+              : Icon.Clock
+          }
+          accessories={[{ text: session.mtime.toLocaleString() }]}
+          actions={
+            <ActionPanel>
+              <Action
+                title={t.resumeSession}
+                icon={Icon.ArrowRight}
+                onAction={() =>
+                  openInTerminal(
+                    project.fullPath,
+                    false,
+                    terminal,
+                    t,
+                    anthropicBaseUrl,
+                    anthropicApiKey,
+                    session.id,
+                  )
                 }
               />
-            );
-          })}
-        </List.Section>
+              <Action.CopyToClipboard
+                title={`${t.copyPath} (${t.sessionId})`}
+                content={session.id}
+              />
+            </ActionPanel>
+          }
+        />
       ))}
     </List>
   );
@@ -909,10 +1442,14 @@ function buildEnvExports(
 ): string {
   const exports: string[] = [];
   if (anthropicBaseUrl?.trim()) {
-    exports.push(`export ANTHROPIC_BASE_URL='${anthropicBaseUrl.replace(/'/g, `'"'"'`)}'`);
+    exports.push(
+      `export ANTHROPIC_BASE_URL='${anthropicBaseUrl.replace(/'/g, `'"'"'`)}'`,
+    );
   }
   if (anthropicApiKey?.trim()) {
-    exports.push(`export ANTHROPIC_API_KEY='${anthropicApiKey.replace(/'/g, `'"'"'`)}'`);
+    exports.push(
+      `export ANTHROPIC_API_KEY='${anthropicApiKey.replace(/'/g, `'"'"'`)}'`,
+    );
   }
   return exports.join(" && ");
 }
@@ -924,8 +1461,13 @@ function openInTerminal(
   t: I18nStrings,
   anthropicBaseUrl?: string,
   anthropicApiKey?: string,
+  sessionId?: string,
 ) {
-  const claudeCmd = continueSession ? "claude -c" : "claude";
+  const claudeCmd = sessionId
+    ? `claude --resume ${sessionId}`
+    : continueSession
+      ? "claude -c"
+      : "claude";
   // Use single quotes for shell (only need to escape single quotes)
   const shellSafePath = projectPath.replace(/'/g, `'"'"'`);
 
@@ -996,6 +1538,20 @@ end tell`;
       });
       return;
 
+    case "ghostty":
+      script = `
+tell application "Ghostty" to activate
+delay 0.5
+tell application "System Events"
+  tell process "Ghostty"
+    keystroke "n" using command down
+    delay 0.3
+    keystroke "${appleScriptCmd}"
+    keystroke return
+  end tell
+end tell`;
+      break;
+
     default:
       script = getITermScript(fullCmd);
   }
@@ -1021,6 +1577,88 @@ end tell`;
 
 function showInFinder(projectPath: string) {
   spawnSync("open", ["-R", projectPath]);
+}
+
+function openInIde(projectPath: string, ide: string) {
+  const cmds: Record<string, string[]> = {
+    code: ["code", projectPath],
+    cursor: ["cursor", projectPath],
+    zed: ["zed", projectPath],
+    webstorm: ["webstorm", projectPath],
+  };
+  const cmd = cmds[ide];
+  if (cmd) spawnSync(cmd[0], cmd.slice(1));
+}
+
+// ============================================================================
+// Session Functions
+// ============================================================================
+
+interface SessionInfo {
+  id: string;
+  mtime: Date;
+  cwd: string | null;
+}
+
+function getProjectSessions(encodedName: string): SessionInfo[] {
+  const projectDir = path.join(
+    os.homedir(),
+    ".claude",
+    "projects",
+    encodedName,
+  );
+  let files: string[];
+  try {
+    files = fs
+      .readdirSync(projectDir)
+      .filter((f) => f.endsWith(".jsonl") && !f.startsWith("agent-"));
+  } catch {
+    return [];
+  }
+  return files
+    .map((f) => {
+      try {
+        const stat = fs.statSync(path.join(projectDir, f));
+        const cwd = readCwdFromSessionFile(path.join(projectDir, f));
+        return { id: f.replace(".jsonl", ""), mtime: stat.mtime, cwd };
+      } catch {
+        return null;
+      }
+    })
+    .filter((s): s is SessionInfo => s !== null)
+    .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+}
+
+// ============================================================================
+// Stale Project Cleanup
+// ============================================================================
+
+function findStaleProjects(): string[] {
+  const claudeProjectsDir = path.join(os.homedir(), ".claude", "projects");
+  if (!fs.existsSync(claudeProjectsDir)) return [];
+  const entries = fs.readdirSync(claudeProjectsDir, { withFileTypes: true });
+  const stale: string[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+    const projectDir = path.join(claudeProjectsDir, entry.name);
+    const { path: fullPath } = getProjectPathAndFiles(projectDir, entry.name);
+    if (!fullPath) stale.push(entry.name);
+  }
+  return stale;
+}
+
+function removeStaleProjects(staleNames: string[]): number {
+  const claudeProjectsDir = path.join(os.homedir(), ".claude", "projects");
+  let removed = 0;
+  for (const name of staleNames) {
+    try {
+      fs.rmSync(path.join(claudeProjectsDir, name), { recursive: true });
+      removed++;
+    } catch {
+      // ignore
+    }
+  }
+  return removed;
 }
 
 // ============================================================================
@@ -1049,9 +1687,13 @@ export default function Command() {
     data: projects = [],
     isLoading,
     revalidate,
-  } = useCachedPromise(loadClaudeProjects, [preferences.defaultPreset || undefined], {
-    keepPreviousData: true,
-  });
+  } = useCachedPromise(
+    loadClaudeProjects,
+    [preferences.defaultPreset || undefined],
+    {
+      keepPreviousData: true,
+    },
+  );
 
   const isFavorite = (project: ClaudeProject) =>
     favorites.includes(project.fullPath);
@@ -1089,10 +1731,13 @@ export default function Command() {
         preferences.showFavoritesFirst && isFavorite(project)
           ? "favorites"
           : getTimeGroup(project.lastModified);
-      const existing = groupedProjects.get(group) || [];
-      groupedProjects.set(group, [...existing, project]);
+      if (!groupedProjects.has(group)) groupedProjects.set(group, []);
+      groupedProjects.get(group)!.push(project);
     }
   }
+
+  // Pre-compute index map for O(1) lookup in grouped view
+  const indexMap = new Map(sortedProjects.map((p, i) => [p.encodedName, i]));
 
   const renderProjectItem = (project: ClaudeProject, index: number) => {
     const favorite = isFavorite(project);
@@ -1104,13 +1749,21 @@ export default function Command() {
         key={project.encodedName}
         title={project.name}
         subtitle={project.fullPath}
+        keywords={project.fullPath.split(/[/\\]/)}
         icon={{
           source: favorite ? Icon.StarCircle : Icon.Terminal,
           tintColor: favorite ? Color.Yellow : Color.Orange,
         }}
         accessories={[
           ...(project.permissionPreset !== "default"
-            ? [{ tag: { value: presetDisplay.label, color: presetDisplay.color } }]
+            ? [
+                {
+                  tag: {
+                    value: presetDisplay.label,
+                    color: presetDisplay.color,
+                  },
+                },
+              ]
             : []),
           { text: t.sessions(project.sessionCount), icon: Icon.Document },
           {
@@ -1151,6 +1804,30 @@ export default function Command() {
                   )
                 }
               />
+              <Action.Push
+                title={t.selectSession}
+                icon={Icon.List}
+                shortcut={{ modifiers: ["cmd", "shift"], key: "s" }}
+                target={
+                  <SessionPicker
+                    project={project}
+                    lang={preferences.language}
+                    terminal={preferences.terminal}
+                    anthropicBaseUrl={preferences.anthropicBaseUrl}
+                    anthropicApiKey={preferences.anthropicApiKey}
+                  />
+                }
+              />
+              {preferences.ideApp ? (
+                <Action
+                  title={t.openInIde}
+                  icon={Icon.AppWindow}
+                  shortcut={{ modifiers: ["cmd", "shift"], key: "i" }}
+                  onAction={() =>
+                    openInIde(project.fullPath, preferences.ideApp!)
+                  }
+                />
+              ) : null}
             </ActionPanel.Section>
             <ActionPanel.Section title={t.sectionManage}>
               <Action
@@ -1183,29 +1860,53 @@ export default function Command() {
               >
                 <Action
                   title={`${t.permStrict} — ${t.permStrictDesc}`}
-                  icon={project.permissionPreset === "strict" ? Icon.CheckCircle : Icon.Circle}
+                  icon={
+                    project.permissionPreset === "strict"
+                      ? Icon.CheckCircle
+                      : Icon.Circle
+                  }
                   onAction={() => {
                     writePermissionPreset(project.fullPath, "strict");
                     revalidate();
-                    showToast({ style: Toast.Style.Success, title: t.permApplied, message: t.permStrict });
+                    showToast({
+                      style: Toast.Style.Success,
+                      title: t.permApplied,
+                      message: t.permStrict,
+                    });
                   }}
                 />
                 <Action
                   title={`${t.permStandard} — ${t.permStandardDesc}`}
-                  icon={project.permissionPreset === "standard" ? Icon.CheckCircle : Icon.Circle}
+                  icon={
+                    project.permissionPreset === "standard"
+                      ? Icon.CheckCircle
+                      : Icon.Circle
+                  }
                   onAction={() => {
                     writePermissionPreset(project.fullPath, "standard");
                     revalidate();
-                    showToast({ style: Toast.Style.Success, title: t.permApplied, message: t.permStandard });
+                    showToast({
+                      style: Toast.Style.Success,
+                      title: t.permApplied,
+                      message: t.permStandard,
+                    });
                   }}
                 />
                 <Action
                   title={`${t.permPermissive} — ${t.permPermissiveDesc}`}
-                  icon={project.permissionPreset === "permissive" ? Icon.CheckCircle : Icon.Circle}
+                  icon={
+                    project.permissionPreset === "permissive"
+                      ? Icon.CheckCircle
+                      : Icon.Circle
+                  }
                   onAction={() => {
                     writePermissionPreset(project.fullPath, "permissive");
                     revalidate();
-                    showToast({ style: Toast.Style.Success, title: t.permApplied, message: t.permPermissive });
+                    showToast({
+                      style: Toast.Style.Success,
+                      title: t.permApplied,
+                      message: t.permPermissive,
+                    });
                   }}
                 />
                 <Action
@@ -1214,7 +1915,10 @@ export default function Command() {
                   onAction={() => {
                     resetPermissions(project.fullPath);
                     revalidate();
-                    showToast({ style: Toast.Style.Success, title: t.permResetDone });
+                    showToast({
+                      style: Toast.Style.Success,
+                      title: t.permResetDone,
+                    });
                   }}
                 />
                 <Action.Push
@@ -1229,6 +1933,57 @@ export default function Command() {
                   }
                 />
               </ActionPanel.Submenu>
+              <ActionPanel.Submenu
+                title={t.batchApply}
+                icon={Icon.BulletPoints}
+              >
+                {(["strict", "standard", "permissive"] as const).map(
+                  (preset) => (
+                    <Action
+                      key={preset}
+                      title={
+                        t[
+                          `perm${preset.charAt(0).toUpperCase() + preset.slice(1)}` as keyof I18nStrings
+                        ] as string
+                      }
+                      onAction={() => {
+                        let count = 0;
+                        for (const p of projects) {
+                          if (p.permissionPreset !== preset) {
+                            writePermissionPreset(p.fullPath, preset);
+                            count++;
+                          }
+                        }
+                        revalidate();
+                        showToast({
+                          style: Toast.Style.Success,
+                          title: t.batchApplyDone(count),
+                        });
+                      }}
+                    />
+                  ),
+                )}
+              </ActionPanel.Submenu>
+              <Action
+                title={t.cleanupStale}
+                icon={Icon.Trash}
+                onAction={() => {
+                  const stale = findStaleProjects();
+                  if (stale.length === 0) {
+                    showToast({
+                      style: Toast.Style.Success,
+                      title: t.cleanupNone,
+                    });
+                    return;
+                  }
+                  const removed = removeStaleProjects(stale);
+                  revalidate();
+                  showToast({
+                    style: Toast.Style.Success,
+                    title: t.cleanupDone(removed),
+                  });
+                }}
+              />
               <Action
                 title={t.configureApi}
                 icon={Icon.Key}
@@ -1275,7 +2030,10 @@ export default function Command() {
                 subtitle={t.projects(groupProjects.length)}
               >
                 {groupProjects.map((project) =>
-                  renderProjectItem(project, sortedProjects.indexOf(project)),
+                  renderProjectItem(
+                    project,
+                    indexMap.get(project.encodedName) ?? -1,
+                  ),
                 )}
               </List.Section>
             );

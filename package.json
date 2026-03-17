@@ -31,7 +31,8 @@
         { "title": "Terminal", "value": "terminal" },
         { "title": "Warp", "value": "warp" },
         { "title": "Alacritty", "value": "alacritty" },
-        { "title": "Kitty", "value": "kitty" }
+        { "title": "Kitty", "value": "kitty" },
+        { "title": "Ghostty", "value": "ghostty" }
       ]
     },
     {
@@ -76,6 +77,21 @@
         { "title": "Strict", "value": "strict" },
         { "title": "Standard", "value": "standard" },
         { "title": "Permissive", "value": "permissive" }
+      ]
+    },
+    {
+      "name": "ideApp",
+      "type": "dropdown",
+      "required": false,
+      "title": "IDE App",
+      "description": "Choose which IDE to open projects in (adds an action to the list)",
+      "default": "",
+      "data": [
+        { "title": "None", "value": "" },
+        { "title": "VS Code", "value": "code" },
+        { "title": "Cursor", "value": "cursor" },
+        { "title": "Zed", "value": "zed" },
+        { "title": "WebStorm", "value": "webstorm" }
       ]
     },
     {
