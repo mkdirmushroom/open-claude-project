@@ -1,6 +1,8 @@
 import {
   Action,
   ActionPanel,
+  Alert,
+  confirmAlert,
   Form,
   List,
   showToast,
@@ -22,6 +24,12 @@ import * as os from "os";
 // Constants
 // ============================================================================
 
+const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
+
+function shellEscape(str: string): string {
+  return str.replace(/'/g, `'"'"'`);
+}
+
 const BUFFER_SIZE = 4096;
 const MAX_SESSION_FILES_TO_CHECK = 3;
 const MAX_LINES_TO_CHECK = 10;
@@ -40,6 +48,8 @@ const DENY_DANGEROUS = [
   "Read(**/*.pem)",
   "Read(**/*.key)",
   "Read(**/*_rsa)",
+  "Read(**/*credentials*)",
+  "Read(**/*secret*)",
 ];
 
 interface PresetConfig {
@@ -617,6 +627,8 @@ const i18n = {
     noSessions: "没有可用的会话",
     noSessionsDesc: "此项目暂无会话记录",
     sessionId: "会话 ID",
+    // Session
+    latest: "最新",
     // Cleanup
     cleanupStale: "清理无效项目",
     cleanupDone: (n: number) => `已清理 ${n} 个无效项目`,
@@ -704,6 +716,7 @@ const i18n = {
     noSessions: "No Sessions Available",
     noSessionsDesc: "No session history for this project",
     sessionId: "Session ID",
+    latest: "latest",
     // Cleanup
     cleanupStale: "Clean Up Stale Projects",
     cleanupDone: (n: number) =>
@@ -723,8 +736,16 @@ type I18nStrings = typeof i18n.zh;
 // Types
 // ============================================================================
 
+type TerminalApp =
+  | "iterm"
+  | "terminal"
+  | "warp"
+  | "alacritty"
+  | "kitty"
+  | "ghostty";
+
 interface Preferences {
-  terminal: "iterm" | "terminal" | "warp" | "alacritty" | "kitty" | "ghostty";
+  terminal: TerminalApp;
   groupByTime: boolean;
   showFavoritesFirst: boolean;
   language: Language;
@@ -838,7 +859,7 @@ function getProjectPathAndFiles(
 async function loadClaudeProjects(
   defaultPreset?: string,
 ): Promise<ClaudeProject[]> {
-  const claudeProjectsDir = path.join(os.homedir(), ".claude", "projects");
+  const claudeProjectsDir = CLAUDE_PROJECTS_DIR;
 
   if (!fs.existsSync(claudeProjectsDir)) {
     return [];
@@ -950,6 +971,14 @@ function sortedJson(arr: string[]): string {
   return JSON.stringify([...arr].sort());
 }
 
+// Pre-compute sorted JSON for constant preset arrays
+const PRESET_SORTED_CACHE = Object.fromEntries(
+  Object.entries(PERMISSION_PRESETS).map(([name, preset]) => [
+    name,
+    { allow: sortedJson(preset.allow), deny: sortedJson(preset.deny) },
+  ]),
+);
+
 function detectPreset(projectPath: string): PermissionPreset {
   const settingsPath = getSettingsPath(projectPath);
   if (!fs.existsSync(settingsPath)) return "default";
@@ -960,10 +989,13 @@ function detectPreset(projectPath: string): PermissionPreset {
     const deny = settings.permissions?.deny || [];
     const mode = settings.defaultMode;
     if (allow.length === 0 && deny.length === 0 && !mode) return "default";
+    const allowJson = sortedJson(allow);
+    const denyJson = sortedJson(deny);
     for (const [name, preset] of Object.entries(PERMISSION_PRESETS)) {
+      const cached = PRESET_SORTED_CACHE[name];
       if (
-        sortedJson(allow) === sortedJson(preset.allow) &&
-        sortedJson(deny) === sortedJson(preset.deny) &&
+        allowJson === cached.allow &&
+        denyJson === cached.deny &&
         mode === preset.defaultMode
       ) {
         return name as PermissionPreset;
@@ -1350,7 +1382,7 @@ function SessionPicker({
 }: {
   project: ClaudeProject;
   lang: Language;
-  terminal: string;
+  terminal: TerminalApp;
   anthropicBaseUrl?: string;
   anthropicApiKey?: string;
 }) {
@@ -1376,7 +1408,7 @@ function SessionPicker({
           key={session.id}
           title={
             idx === 0
-              ? `${formatRelativeTime(session.mtime, t)} (latest)`
+              ? `${formatRelativeTime(session.mtime, t)} (${t.latest})`
               : formatRelativeTime(session.mtime, t)
           }
           subtitle={session.id.substring(0, 8)}
@@ -1443,13 +1475,11 @@ function buildEnvExports(
   const exports: string[] = [];
   if (anthropicBaseUrl?.trim()) {
     exports.push(
-      `export ANTHROPIC_BASE_URL='${anthropicBaseUrl.replace(/'/g, `'"'"'`)}'`,
+      `export ANTHROPIC_BASE_URL='${shellEscape(anthropicBaseUrl)}'`,
     );
   }
   if (anthropicApiKey?.trim()) {
-    exports.push(
-      `export ANTHROPIC_API_KEY='${anthropicApiKey.replace(/'/g, `'"'"'`)}'`,
-    );
+    exports.push(`export ANTHROPIC_API_KEY='${shellEscape(anthropicApiKey)}'`);
   }
   return exports.join(" && ");
 }
@@ -1457,19 +1487,19 @@ function buildEnvExports(
 function openInTerminal(
   projectPath: string,
   continueSession: boolean,
-  terminal: string,
+  terminal: TerminalApp,
   t: I18nStrings,
   anthropicBaseUrl?: string,
   anthropicApiKey?: string,
   sessionId?: string,
 ) {
   const claudeCmd = sessionId
-    ? `claude --resume ${sessionId}`
+    ? `claude --resume '${shellEscape(sessionId)}'`
     : continueSession
       ? "claude -c"
       : "claude";
   // Use single quotes for shell (only need to escape single quotes)
-  const shellSafePath = projectPath.replace(/'/g, `'"'"'`);
+  const shellSafePath = shellEscape(projectPath);
 
   // Build environment variable exports
   const envExports = buildEnvExports(anthropicBaseUrl, anthropicApiKey);
@@ -1522,14 +1552,15 @@ end tell`;
       });
       return;
 
-    case "kitty":
+    case "kitty": {
+      const kittyCmd = envExports ? `${envExports} && ${claudeCmd}` : claudeCmd;
       spawnSync("kitty", [
         "--single-instance",
         "--directory",
         projectPath,
         "bash",
         "-c",
-        claudeCmd,
+        kittyCmd,
       ]);
       showToast({
         style: Toast.Style.Success,
@@ -1537,8 +1568,9 @@ end tell`;
         message: path.basename(projectPath),
       });
       return;
+    }
 
-    case "ghostty":
+    case "ghostty": {
       script = `
 tell application "Ghostty" to activate
 delay 0.5
@@ -1551,9 +1583,10 @@ tell application "System Events"
   end tell
 end tell`;
       break;
+    }
 
     default:
-      script = getITermScript(fullCmd);
+      script = getITermScript(appleScriptCmd);
   }
 
   const result = spawnSync("osascript", ["-e", script], { encoding: "utf-8" });
@@ -1579,7 +1612,7 @@ function showInFinder(projectPath: string) {
   spawnSync("open", ["-R", projectPath]);
 }
 
-function openInIde(projectPath: string, ide: string) {
+function openInIde(projectPath: string, ide: string, t: I18nStrings) {
   const cmds: Record<string, string[]> = {
     code: ["code", projectPath],
     cursor: ["cursor", projectPath],
@@ -1587,7 +1620,21 @@ function openInIde(projectPath: string, ide: string) {
     webstorm: ["webstorm", projectPath],
   };
   const cmd = cmds[ide];
-  if (cmd) spawnSync(cmd[0], cmd.slice(1));
+  if (!cmd) return;
+  const result = spawnSync(cmd[0], cmd.slice(1));
+  if (result.status === 0 || result.status === null) {
+    showToast({
+      style: Toast.Style.Success,
+      title: t.openInIde,
+      message: path.basename(projectPath),
+    });
+  } else {
+    showToast({
+      style: Toast.Style.Failure,
+      title: t.openInIde,
+      message: result.stderr?.toString().trim() || t.unknownError,
+    });
+  }
 }
 
 // ============================================================================
@@ -1597,7 +1644,6 @@ function openInIde(projectPath: string, ide: string) {
 interface SessionInfo {
   id: string;
   mtime: Date;
-  cwd: string | null;
 }
 
 function getProjectSessions(encodedName: string): SessionInfo[] {
@@ -1619,8 +1665,7 @@ function getProjectSessions(encodedName: string): SessionInfo[] {
     .map((f) => {
       try {
         const stat = fs.statSync(path.join(projectDir, f));
-        const cwd = readCwdFromSessionFile(path.join(projectDir, f));
-        return { id: f.replace(".jsonl", ""), mtime: stat.mtime, cwd };
+        return { id: f.replace(".jsonl", ""), mtime: stat.mtime };
       } catch {
         return null;
       }
@@ -1634,7 +1679,7 @@ function getProjectSessions(encodedName: string): SessionInfo[] {
 // ============================================================================
 
 function findStaleProjects(): string[] {
-  const claudeProjectsDir = path.join(os.homedir(), ".claude", "projects");
+  const claudeProjectsDir = CLAUDE_PROJECTS_DIR;
   if (!fs.existsSync(claudeProjectsDir)) return [];
   const entries = fs.readdirSync(claudeProjectsDir, { withFileTypes: true });
   const stale: string[] = [];
@@ -1648,7 +1693,7 @@ function findStaleProjects(): string[] {
 }
 
 function removeStaleProjects(staleNames: string[]): number {
-  const claudeProjectsDir = path.join(os.homedir(), ".claude", "projects");
+  const claudeProjectsDir = CLAUDE_PROJECTS_DIR;
   let removed = 0;
   for (const name of staleNames) {
     try {
@@ -1695,8 +1740,9 @@ export default function Command() {
     },
   );
 
+  const favoritesSet = new Set(favorites);
   const isFavorite = (project: ClaudeProject) =>
-    favorites.includes(project.fullPath);
+    favoritesSet.has(project.fullPath);
 
   const toggleFavorite = async (project: ClaudeProject) => {
     const wasFavorite = isFavorite(project);
@@ -1824,7 +1870,7 @@ export default function Command() {
                   icon={Icon.AppWindow}
                   shortcut={{ modifiers: ["cmd", "shift"], key: "i" }}
                   onAction={() =>
-                    openInIde(project.fullPath, preferences.ideApp!)
+                    openInIde(project.fullPath, preferences.ideApp!, t)
                   }
                 />
               ) : null}
@@ -1858,57 +1904,44 @@ export default function Command() {
                 icon={Icon.Lock}
                 shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
               >
-                <Action
-                  title={`${t.permStrict} — ${t.permStrictDesc}`}
-                  icon={
-                    project.permissionPreset === "strict"
-                      ? Icon.CheckCircle
-                      : Icon.Circle
-                  }
-                  onAction={() => {
-                    writePermissionPreset(project.fullPath, "strict");
-                    revalidate();
-                    showToast({
-                      style: Toast.Style.Success,
-                      title: t.permApplied,
-                      message: t.permStrict,
-                    });
-                  }}
-                />
-                <Action
-                  title={`${t.permStandard} — ${t.permStandardDesc}`}
-                  icon={
-                    project.permissionPreset === "standard"
-                      ? Icon.CheckCircle
-                      : Icon.Circle
-                  }
-                  onAction={() => {
-                    writePermissionPreset(project.fullPath, "standard");
-                    revalidate();
-                    showToast({
-                      style: Toast.Style.Success,
-                      title: t.permApplied,
-                      message: t.permStandard,
-                    });
-                  }}
-                />
-                <Action
-                  title={`${t.permPermissive} — ${t.permPermissiveDesc}`}
-                  icon={
-                    project.permissionPreset === "permissive"
-                      ? Icon.CheckCircle
-                      : Icon.Circle
-                  }
-                  onAction={() => {
-                    writePermissionPreset(project.fullPath, "permissive");
-                    revalidate();
-                    showToast({
-                      style: Toast.Style.Success,
-                      title: t.permApplied,
-                      message: t.permPermissive,
-                    });
-                  }}
-                />
+                {(
+                  [
+                    {
+                      key: "strict",
+                      label: t.permStrict,
+                      desc: t.permStrictDesc,
+                    },
+                    {
+                      key: "standard",
+                      label: t.permStandard,
+                      desc: t.permStandardDesc,
+                    },
+                    {
+                      key: "permissive",
+                      label: t.permPermissive,
+                      desc: t.permPermissiveDesc,
+                    },
+                  ] as const
+                ).map((p) => (
+                  <Action
+                    key={p.key}
+                    title={`${p.label} — ${p.desc}`}
+                    icon={
+                      project.permissionPreset === p.key
+                        ? Icon.CheckCircle
+                        : Icon.Circle
+                    }
+                    onAction={() => {
+                      writePermissionPreset(project.fullPath, p.key);
+                      revalidate();
+                      showToast({
+                        style: Toast.Style.Success,
+                        title: t.permApplied,
+                        message: p.label,
+                      });
+                    }}
+                  />
+                ))}
                 <Action
                   title={t.permReset}
                   icon={Icon.XMarkCircle}
@@ -1967,7 +2000,7 @@ export default function Command() {
               <Action
                 title={t.cleanupStale}
                 icon={Icon.Trash}
-                onAction={() => {
+                onAction={async () => {
                   const stale = findStaleProjects();
                   if (stale.length === 0) {
                     showToast({
@@ -1976,6 +2009,15 @@ export default function Command() {
                     });
                     return;
                   }
+                  const confirmed = await confirmAlert({
+                    title: t.cleanupConfirm,
+                    message: t.cleanupDone(stale.length),
+                    primaryAction: {
+                      title: t.cleanupStale,
+                      style: Alert.ActionStyle.Destructive,
+                    },
+                  });
+                  if (!confirmed) return;
                   const removed = removeStaleProjects(stale);
                   revalidate();
                   showToast({
