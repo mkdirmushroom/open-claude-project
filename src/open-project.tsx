@@ -1418,17 +1418,21 @@ function SessionPicker({
         <List.Item
           key={session.id}
           title={
-            idx === 0
+            session.title ||
+            (idx === 0
               ? `${formatRelativeTime(session.mtime, t)} (${t.latest})`
-              : formatRelativeTime(session.mtime, t)
+              : formatRelativeTime(session.mtime, t))
           }
-          subtitle={session.id.substring(0, 8)}
+          subtitle={formatRelativeTime(session.mtime, t)}
           icon={
             idx === 0
               ? { source: Icon.Clock, tintColor: Color.Green }
               : Icon.Clock
           }
-          accessories={[{ text: session.mtime.toLocaleString() }]}
+          accessories={[
+            ...(idx === 0 ? [{ tag: { value: t.latest, color: Color.Green } }] : []),
+            { text: session.mtime.toLocaleString() },
+          ]}
           actions={
             <ActionPanel>
               <Action
@@ -1655,6 +1659,61 @@ function openInIde(projectPath: string, ide: string, t: I18nStrings) {
 interface SessionInfo {
   id: string;
   mtime: Date;
+  title: string;
+}
+
+function getSessionTitle(filePath: string): string {
+  // Use grep to efficiently scan large JSONL files for summary entries
+  try {
+    const result = spawnSync("grep", ['"type":"summary"', filePath], {
+      encoding: "utf-8",
+      maxBuffer: 256 * 1024,
+      timeout: 3000,
+    });
+    if (result.status === 0 && result.stdout) {
+      const lines = result.stdout.trim().split("\n");
+      for (let i = lines.length - 1; i >= 0; i--) {
+        try {
+          const obj = JSON.parse(lines[i]);
+          if (obj.type === "summary" && obj.summary) return obj.summary;
+        } catch {
+          /* partial match */
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // Fallback: first user message via grep (handles large files with late user entries)
+  try {
+    const result = spawnSync("grep", ["-m", "1", '"type":"user"', filePath], {
+      encoding: "utf-8",
+      maxBuffer: 64 * 1024,
+      timeout: 3000,
+    });
+    if (result.status === 0 && result.stdout) {
+      try {
+        const obj = JSON.parse(result.stdout.trim().split("\n")[0]);
+        if (obj.type === "user") {
+          const content = obj.message?.content;
+          if (Array.isArray(content)) {
+            for (const c of content) {
+              if (c.type === "text" && c.text) return c.text.slice(0, 80);
+            }
+          } else if (typeof content === "string") {
+            return content.slice(0, 80);
+          }
+        }
+      } catch {
+        /* parse error */
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return "";
 }
 
 function getProjectSessions(encodedName: string): SessionInfo[] {
@@ -1675,8 +1734,12 @@ function getProjectSessions(encodedName: string): SessionInfo[] {
   return files
     .map((f) => {
       try {
-        const stat = fs.statSync(path.join(projectDir, f));
-        return { id: f.replace(".jsonl", ""), mtime: stat.mtime };
+        const filePath = path.join(projectDir, f);
+        const stat = fs.statSync(filePath);
+        const title = getSessionTitle(filePath);
+        // Skip files with no conversation content (e.g. file-history-snapshot only)
+        if (!title) return null;
+        return { id: f.replace(".jsonl", ""), mtime: stat.mtime, title };
       } catch {
         return null;
       }
