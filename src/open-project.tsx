@@ -990,9 +990,10 @@ function detectPreset(projectPath: string): PermissionPreset {
   try {
     const content = fs.readFileSync(settingsPath, "utf-8");
     const settings = JSON.parse(content);
-    const allow: string[] = settings.permissions?.allow || [];
-    const deny: string[] = settings.permissions?.deny || [];
-    const mode = settings.defaultMode;
+    const permsObj = settings.permissions || {};
+    const allow: string[] = permsObj.allow || [];
+    const deny: string[] = permsObj.deny || [];
+    const mode = permsObj.defaultMode || settings.defaultMode; // support both locations
     if (allow.length === 0 && deny.length === 0 && !mode) return "default";
     const allowJson = sortedJson(allow);
     for (const [name, preset] of Object.entries(PERMISSION_PRESETS)) {
@@ -1033,12 +1034,13 @@ function writePermissionPreset(projectPath: string, presetName: string): void {
     }
   }
   const preset = PERMISSION_PRESETS[presetName];
+  // Clean up legacy top-level defaultMode
+  delete settings.defaultMode;
+  const perms: Record<string, unknown> = { allow: preset.allow, deny: preset.deny };
   if (preset.defaultMode) {
-    settings.defaultMode = preset.defaultMode;
-  } else {
-    delete settings.defaultMode;
+    perms.defaultMode = preset.defaultMode;
   }
-  settings.permissions = { allow: preset.allow, deny: preset.deny };
+  settings.permissions = perms;
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
 }
 
@@ -1047,7 +1049,7 @@ function resetPermissions(projectPath: string): void {
   if (!fs.existsSync(settingsPath)) return;
   try {
     const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-    delete settings.defaultMode;
+    delete settings.defaultMode; // clean up legacy top-level placement
     delete settings.permissions;
     if (Object.keys(settings).length === 0) {
       fs.unlinkSync(settingsPath);
@@ -1187,7 +1189,7 @@ function PermissionEditor({
   const perms = (settings.permissions as Record<string, unknown>) || {};
   const allow: string[] = (perms.allow as string[]) || [];
   const deny: string[] = (perms.deny as string[]) || [];
-  const currentMode = (settings.defaultMode as string) || "default";
+  const currentMode = (perms.defaultMode as string) || (settings.defaultMode as string) || "default";
 
   // Find rules not in the catalog
   const customRules = [
@@ -1230,8 +1232,14 @@ function PermissionEditor({
 
   const setMode = (value: string) => {
     const next = { ...settings };
-    if (value === "default") delete next.defaultMode;
-    else next.defaultMode = value;
+    delete next.defaultMode; // clean up legacy top-level placement
+    const nextPerms = { ...(next.permissions as Record<string, unknown> || {}) };
+    if (value === "default") {
+      delete nextPerms.defaultMode;
+    } else {
+      nextPerms.defaultMode = value;
+    }
+    next.permissions = nextPerms;
     update(next);
   };
 
