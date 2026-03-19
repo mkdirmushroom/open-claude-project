@@ -967,74 +967,54 @@ function getSettingsPath(projectPath: string): string {
   return path.join(projectPath, ".claude", "settings.local.json");
 }
 
-function sortedJson(arr: string[]): string {
-  return JSON.stringify([...arr].sort());
-}
-
-// Pre-compute sorted JSON for constant preset arrays
-const PRESET_SORTED_CACHE = Object.fromEntries(
-  Object.entries(PERMISSION_PRESETS).map(([name, preset]) => [
-    name,
-    { allow: sortedJson(preset.allow), deny: sortedJson(preset.deny) },
-  ]),
-);
-
 function isSubset(subset: string[], superset: string[]): boolean {
   const superSet = new Set(superset);
   return subset.every((item) => superSet.has(item));
 }
 
+function resolveDefaultMode(settings: Record<string, unknown>): string | undefined {
+  const perms = (settings.permissions as Record<string, unknown>) || {};
+  return (perms.defaultMode as string) || (settings.defaultMode as string) || undefined;
+}
+
 function detectPreset(projectPath: string): PermissionPreset {
-  const settingsPath = getSettingsPath(projectPath);
-  if (!fs.existsSync(settingsPath)) return "default";
-  try {
-    const content = fs.readFileSync(settingsPath, "utf-8");
-    const settings = JSON.parse(content);
-    const permsObj = settings.permissions || {};
-    const allow: string[] = permsObj.allow || [];
-    const deny: string[] = permsObj.deny || [];
-    const mode = permsObj.defaultMode || settings.defaultMode; // support both locations
-    if (allow.length === 0 && deny.length === 0 && !mode) return "default";
-    const allowJson = sortedJson(allow);
-    for (const [name, preset] of Object.entries(PERMISSION_PRESETS)) {
-      const cached = PRESET_SORTED_CACHE[name];
-      if (allowJson === cached.allow && mode === preset.defaultMode) {
-        if (sortedJson(deny) === cached.deny) {
-          return name as PermissionPreset;
-        }
-        // Auto-upgrade: deny is a subset of the preset's deny (missing new rules)
-        if (isSubset(deny, preset.deny)) {
-          settings.permissions.deny = preset.deny;
-          fs.writeFileSync(
-            settingsPath,
-            JSON.stringify(settings, null, 2) + "\n",
-          );
-          return name as PermissionPreset;
-        }
-      }
+  const settings = readSettings(projectPath);
+  const permsObj = (settings.permissions as Record<string, unknown>) || {};
+  const allow: string[] = (permsObj.allow as string[]) || [];
+  const deny: string[] = (permsObj.deny as string[]) || [];
+  const mode = resolveDefaultMode(settings);
+  if (allow.length === 0 && deny.length === 0 && !mode) return "default";
+  for (const [name, preset] of Object.entries(PERMISSION_PRESETS)) {
+    if (mode !== preset.defaultMode) continue;
+    // Preset's rules must all be present (user may have added extras via "don't ask again")
+    if (!isSubset(preset.allow, allow)) continue;
+    if (isSubset(preset.deny, deny)) return name as PermissionPreset;
+    // Auto-upgrade: user has fewer deny rules (missing newly added ones)
+    if (isSubset(deny, preset.deny)) {
+      permsObj.deny = preset.deny;
+      fs.writeFileSync(
+        getSettingsPath(projectPath),
+        JSON.stringify(settings, null, 2) + "\n",
+      );
+      return name as PermissionPreset;
     }
-    return "custom";
+  }
+  return "custom";
+}
+
+function readSettings(projectPath: string): Record<string, unknown> {
+  try {
+    return JSON.parse(fs.readFileSync(getSettingsPath(projectPath), "utf-8"));
   } catch {
-    return "default";
+    return {};
   }
 }
 
 function writePermissionPreset(projectPath: string, presetName: string): void {
-  const claudeDir = path.join(projectPath, ".claude");
-  const settingsPath = path.join(claudeDir, "settings.local.json");
-  if (!fs.existsSync(claudeDir)) {
-    fs.mkdirSync(claudeDir, { recursive: true });
-  }
-  let settings: Record<string, unknown> = {};
-  if (fs.existsSync(settingsPath)) {
-    try {
-      settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-    } catch {
-      settings = {};
-    }
-  }
+  const settingsPath = getSettingsPath(projectPath);
+  fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+  const settings = readSettings(projectPath);
   const preset = PERMISSION_PRESETS[presetName];
-  // Clean up legacy top-level defaultMode
   delete settings.defaultMode;
   const perms: Record<string, unknown> = { allow: preset.allow, deny: preset.deny };
   if (preset.defaultMode) {
@@ -1046,10 +1026,10 @@ function writePermissionPreset(projectPath: string, presetName: string): void {
 
 function resetPermissions(projectPath: string): void {
   const settingsPath = getSettingsPath(projectPath);
-  if (!fs.existsSync(settingsPath)) return;
   try {
-    const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-    delete settings.defaultMode; // clean up legacy top-level placement
+    const settings = readSettings(projectPath);
+    if (Object.keys(settings).length === 0) return;
+    delete settings.defaultMode;
     delete settings.permissions;
     if (Object.keys(settings).length === 0) {
       fs.unlinkSync(settingsPath);
@@ -1083,11 +1063,8 @@ function saveSettings(
   projectPath: string,
   settings: Record<string, unknown>,
 ): void {
-  const claudeDir = path.join(projectPath, ".claude");
-  const settingsPath = path.join(claudeDir, "settings.local.json");
-  if (!fs.existsSync(claudeDir)) {
-    fs.mkdirSync(claudeDir, { recursive: true });
-  }
+  const settingsPath = getSettingsPath(projectPath);
+  fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
   // Deep clone to avoid mutating React state
   const clean = JSON.parse(JSON.stringify(settings)) as Record<string, unknown>;
   const perms = clean.permissions as Record<string, unknown> | undefined;
@@ -1098,7 +1075,7 @@ function saveSettings(
     if (Object.keys(perms).length === 0) delete clean.permissions;
   }
   if (Object.keys(clean).length === 0) {
-    if (fs.existsSync(settingsPath)) fs.unlinkSync(settingsPath);
+    try { fs.unlinkSync(settingsPath); } catch { /* not exists */ }
     return;
   }
   fs.writeFileSync(settingsPath, JSON.stringify(clean, null, 2) + "\n");
@@ -1174,22 +1151,14 @@ function PermissionEditor({
   onUpdate: () => void;
 }) {
   const t = i18n[lang];
-  const [settings, setSettings] = useState<Record<string, unknown>>(() => {
-    const settingsPath = getSettingsPath(projectPath);
-    if (fs.existsSync(settingsPath)) {
-      try {
-        return JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-      } catch {
-        return {};
-      }
-    }
-    return {};
-  });
+  const [settings, setSettings] = useState<Record<string, unknown>>(() =>
+    readSettings(projectPath),
+  );
 
   const perms = (settings.permissions as Record<string, unknown>) || {};
   const allow: string[] = (perms.allow as string[]) || [];
   const deny: string[] = (perms.deny as string[]) || [];
-  const currentMode = (perms.defaultMode as string) || (settings.defaultMode as string) || "default";
+  const currentMode = resolveDefaultMode(settings) || "default";
 
   // Find rules not in the catalog
   const customRules = [
@@ -1406,9 +1375,12 @@ function SessionPicker({
   anthropicApiKey?: string;
 }) {
   const t = i18n[lang];
-  const sessions = getProjectSessions(project.encodedName);
+  const { data: sessions = [], isLoading } = useCachedPromise(
+    getProjectSessions,
+    [project.encodedName],
+  );
 
-  if (sessions.length === 0) {
+  if (!isLoading && sessions.length === 0) {
     return (
       <List navigationTitle={t.selectSession}>
         <List.EmptyView
@@ -1421,16 +1393,11 @@ function SessionPicker({
   }
 
   return (
-    <List navigationTitle={`${t.selectSession} — ${project.name}`}>
+    <List isLoading={isLoading} navigationTitle={`${t.selectSession} — ${project.name}`}>
       {sessions.map((session, idx) => (
         <List.Item
           key={session.id}
-          title={
-            session.title ||
-            (idx === 0
-              ? `${formatRelativeTime(session.mtime, t)} (${t.latest})`
-              : formatRelativeTime(session.mtime, t))
-          }
+          title={session.title}
           subtitle={formatRelativeTime(session.mtime, t)}
           icon={
             idx === 0
@@ -1670,67 +1637,64 @@ interface SessionInfo {
   title: string;
 }
 
-function getSessionTitle(filePath: string): string {
-  // Use grep to efficiently scan large JSONL files for summary entries
+function grepJsonl(
+  filePath: string,
+  pattern: string,
+  maxResults?: number,
+): string[] {
   try {
-    const result = spawnSync("grep", ['"type":"summary"', filePath], {
+    const args = maxResults ? ["-m", String(maxResults), pattern, filePath] : [pattern, filePath];
+    const result = spawnSync("grep", args, {
       encoding: "utf-8",
       maxBuffer: 256 * 1024,
       timeout: 3000,
     });
     if (result.status === 0 && result.stdout) {
-      const lines = result.stdout.trim().split("\n");
-      for (let i = lines.length - 1; i >= 0; i--) {
-        try {
-          const obj = JSON.parse(lines[i]);
-          if (obj.type === "summary" && obj.summary) return obj.summary;
-        } catch {
-          /* partial match */
-        }
-      }
+      return result.stdout.trim().split("\n");
     }
   } catch {
     /* ignore */
   }
+  return [];
+}
 
-  // Fallback: first user message via grep (handles large files with late user entries)
-  try {
-    const result = spawnSync("grep", ["-m", "1", '"type":"user"', filePath], {
-      encoding: "utf-8",
-      maxBuffer: 64 * 1024,
-      timeout: 3000,
-    });
-    if (result.status === 0 && result.stdout) {
-      try {
-        const obj = JSON.parse(result.stdout.trim().split("\n")[0]);
-        if (obj.type === "user") {
-          const content = obj.message?.content;
-          if (Array.isArray(content)) {
-            for (const c of content) {
-              if (c.type === "text" && c.text) return c.text.slice(0, 80);
-            }
-          } else if (typeof content === "string") {
-            return content.slice(0, 80);
-          }
-        }
-      } catch {
-        /* parse error */
-      }
+function getSessionTitle(filePath: string): string {
+  // Last summary entry (AI-generated conversation title)
+  const summaryLines = grepJsonl(filePath, '"type":"summary"');
+  for (let i = summaryLines.length - 1; i >= 0; i--) {
+    try {
+      const obj = JSON.parse(summaryLines[i]);
+      if (obj.type === "summary" && obj.summary) return obj.summary;
+    } catch {
+      /* partial match */
     }
-  } catch {
-    /* ignore */
+  }
+
+  // Fallback: first user message
+  const userLines = grepJsonl(filePath, '"type":"user"', 1);
+  if (userLines.length > 0) {
+    try {
+      const obj = JSON.parse(userLines[0]);
+      if (obj.type === "user") {
+        const content = obj.message?.content;
+        if (Array.isArray(content)) {
+          for (const c of content) {
+            if (c.type === "text" && c.text) return c.text.slice(0, 80);
+          }
+        } else if (typeof content === "string") {
+          return content.slice(0, 80);
+        }
+      }
+    } catch {
+      /* parse error */
+    }
   }
 
   return "";
 }
 
-function getProjectSessions(encodedName: string): SessionInfo[] {
-  const projectDir = path.join(
-    os.homedir(),
-    ".claude",
-    "projects",
-    encodedName,
-  );
+async function getProjectSessions(encodedName: string): Promise<SessionInfo[]> {
+  const projectDir = path.join(CLAUDE_PROJECTS_DIR, encodedName);
   let files: string[];
   try {
     files = fs
@@ -1745,7 +1709,6 @@ function getProjectSessions(encodedName: string): SessionInfo[] {
         const filePath = path.join(projectDir, f);
         const stat = fs.statSync(filePath);
         const title = getSessionTitle(filePath);
-        // Skip files with no conversation content (e.g. file-history-snapshot only)
         if (!title) return null;
         return { id: f.replace(".jsonl", ""), mtime: stat.mtime, title };
       } catch {
