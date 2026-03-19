@@ -967,11 +967,6 @@ function getSettingsPath(projectPath: string): string {
   return path.join(projectPath, ".claude", "settings.local.json");
 }
 
-function isSubset(subset: string[], superset: string[]): boolean {
-  const superSet = new Set(superset);
-  return subset.every((item) => superSet.has(item));
-}
-
 function resolveDefaultMode(settings: Record<string, unknown>): string | undefined {
   const perms = (settings.permissions as Record<string, unknown>) || {};
   return (perms.defaultMode as string) || (settings.defaultMode as string) || undefined;
@@ -979,26 +974,15 @@ function resolveDefaultMode(settings: Record<string, unknown>): string | undefin
 
 function detectPreset(projectPath: string): PermissionPreset {
   const settings = readSettings(projectPath);
+  // Stored preset metadata (written by Raycast, not affected by "don't ask again")
+  const stored = settings._preset as string | undefined;
+  if (stored && stored in PERMISSION_PRESETS) return stored as PermissionPreset;
+  // No metadata: check if any rules exist at all
   const permsObj = (settings.permissions as Record<string, unknown>) || {};
   const allow: string[] = (permsObj.allow as string[]) || [];
   const deny: string[] = (permsObj.deny as string[]) || [];
   const mode = resolveDefaultMode(settings);
   if (allow.length === 0 && deny.length === 0 && !mode) return "default";
-  for (const [name, preset] of Object.entries(PERMISSION_PRESETS)) {
-    if (mode !== preset.defaultMode) continue;
-    // Preset's rules must all be present (user may have added extras via "don't ask again")
-    if (!isSubset(preset.allow, allow)) continue;
-    if (isSubset(preset.deny, deny)) return name as PermissionPreset;
-    // Auto-upgrade: user has fewer deny rules (missing newly added ones)
-    if (isSubset(deny, preset.deny)) {
-      permsObj.deny = preset.deny;
-      fs.writeFileSync(
-        getSettingsPath(projectPath),
-        JSON.stringify(settings, null, 2) + "\n",
-      );
-      return name as PermissionPreset;
-    }
-  }
   return "custom";
 }
 
@@ -1021,6 +1005,7 @@ function writePermissionPreset(projectPath: string, presetName: string): void {
     perms.defaultMode = preset.defaultMode;
   }
   settings.permissions = perms;
+  settings._preset = presetName;
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
 }
 
@@ -1031,6 +1016,7 @@ function resetPermissions(projectPath: string): void {
     if (Object.keys(settings).length === 0) return;
     delete settings.defaultMode;
     delete settings.permissions;
+    delete settings._preset;
     if (Object.keys(settings).length === 0) {
       fs.unlinkSync(settingsPath);
     } else {
