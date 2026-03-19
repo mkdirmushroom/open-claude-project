@@ -1053,6 +1053,8 @@ function saveSettings(
   fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
   // Deep clone to avoid mutating React state
   const clean = JSON.parse(JSON.stringify(settings)) as Record<string, unknown>;
+  // User manually edited rules — no longer a clean preset
+  delete clean._preset;
   const perms = clean.permissions as Record<string, unknown> | undefined;
   if (perms) {
     if (Array.isArray(perms.allow) && perms.allow.length === 0)
