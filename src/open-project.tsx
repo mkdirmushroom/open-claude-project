@@ -1549,15 +1549,18 @@ end tell`;
     }
 
     case "ghostty": {
-      const tmpScript = `/tmp/claude-ghostty-${Date.now()}.sh`;
-      fs.writeFileSync(tmpScript, `#!/bin/zsh -l\n${fullCmd}\nexec zsh -l\n`, { mode: 0o755 });
-      spawnSync("open", ["-na", "Ghostty.app", "--args", "-e", tmpScript]);
-      showToast({
-        style: Toast.Style.Success,
-        title: t.openedInTerminal,
-        message: path.basename(projectPath),
-      });
-      return;
+      script = `
+tell application "Ghostty" to activate
+delay 0.5
+tell application "System Events"
+  tell process "Ghostty"
+    keystroke "n" using command down
+    delay 0.3
+    keystroke "${appleScriptCmd}"
+    keystroke return
+  end tell
+end tell`;
+      break;
     }
 
     default:
