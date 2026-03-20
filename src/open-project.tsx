@@ -1549,18 +1549,13 @@ end tell`;
     }
 
     case "ghostty": {
-      script = `
-tell application "Ghostty" to activate
-delay 0.5
-tell application "System Events"
-  tell process "Ghostty"
-    keystroke "t" using command down
-    delay 0.3
-    keystroke "${appleScriptCmd}"
-    keystroke return
-  end tell
-end tell`;
-      break;
+      spawnSync("open", ["-na", "Ghostty.app", "--args", "-e", "bash", "-c", fullCmd]);
+      showToast({
+        style: Toast.Style.Success,
+        title: t.openedInTerminal,
+        message: path.basename(projectPath),
+      });
+      return;
     }
 
     default:
