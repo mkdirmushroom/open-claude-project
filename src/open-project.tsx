@@ -627,7 +627,6 @@ const i18n = {
     noSessions: "没有可用的会话",
     noSessionsDesc: "此项目暂无会话记录",
     sessionId: "会话 ID",
-    // Session
     latest: "最新",
     // Cleanup
     cleanupStale: "清理无效项目",
@@ -859,13 +858,11 @@ function getProjectPathAndFiles(
 async function loadClaudeProjects(
   defaultPreset?: string,
 ): Promise<ClaudeProject[]> {
-  const claudeProjectsDir = CLAUDE_PROJECTS_DIR;
-
-  if (!fs.existsSync(claudeProjectsDir)) {
+  if (!fs.existsSync(CLAUDE_PROJECTS_DIR)) {
     return [];
   }
 
-  const entries = fs.readdirSync(claudeProjectsDir, { withFileTypes: true });
+  const entries = fs.readdirSync(CLAUDE_PROJECTS_DIR, { withFileTypes: true });
   const projects: ClaudeProject[] = [];
   const seenPaths = new Set<string>();
 
@@ -874,7 +871,7 @@ async function loadClaudeProjects(
       continue;
     }
 
-    const projectDir = path.join(claudeProjectsDir, entry.name);
+    const projectDir = path.join(CLAUDE_PROJECTS_DIR, entry.name);
     const { path: fullPath, sessionFiles } = getProjectPathAndFiles(
       projectDir,
       entry.name,
@@ -1010,21 +1007,12 @@ function writePermissionPreset(projectPath: string, presetName: string): void {
 }
 
 function resetPermissions(projectPath: string): void {
-  const settingsPath = getSettingsPath(projectPath);
-  try {
-    const settings = readSettings(projectPath);
-    if (Object.keys(settings).length === 0) return;
-    delete settings.defaultMode;
-    delete settings.permissions;
-    delete settings._preset;
-    if (Object.keys(settings).length === 0) {
-      fs.unlinkSync(settingsPath);
-    } else {
-      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
-    }
-  } catch {
-    // ignore
-  }
+  const settings = readSettings(projectPath);
+  if (Object.keys(settings).length === 0) return;
+  delete settings.defaultMode;
+  delete settings.permissions;
+  delete settings._preset;
+  saveSettings(projectPath, settings);
 }
 
 function getPresetDisplay(
@@ -1213,9 +1201,8 @@ function PermissionEditor({
         icon={Icon.CodeBlock}
         shortcut={{ modifiers: ["cmd", "shift"], key: "e" }}
         onAction={() => {
-          const sp = getSettingsPath(projectPath);
-          if (!fs.existsSync(sp)) saveSettings(projectPath, settings);
-          spawnSync("open", ["-t", sp]);
+          saveSettings(projectPath, settings);
+          spawnSync("open", ["-t", getSettingsPath(projectPath)]);
         }}
       />
     </>
@@ -1712,13 +1699,13 @@ async function getProjectSessions(encodedName: string): Promise<SessionInfo[]> {
 // ============================================================================
 
 function findStaleProjects(): string[] {
-  const claudeProjectsDir = CLAUDE_PROJECTS_DIR;
-  if (!fs.existsSync(claudeProjectsDir)) return [];
-  const entries = fs.readdirSync(claudeProjectsDir, { withFileTypes: true });
+
+  if (!fs.existsSync(CLAUDE_PROJECTS_DIR)) return [];
+  const entries = fs.readdirSync(CLAUDE_PROJECTS_DIR, { withFileTypes: true });
   const stale: string[] = [];
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
-    const projectDir = path.join(claudeProjectsDir, entry.name);
+    const projectDir = path.join(CLAUDE_PROJECTS_DIR, entry.name);
     const { path: fullPath } = getProjectPathAndFiles(projectDir, entry.name);
     if (!fullPath) stale.push(entry.name);
   }
@@ -1726,11 +1713,11 @@ function findStaleProjects(): string[] {
 }
 
 function removeStaleProjects(staleNames: string[]): number {
-  const claudeProjectsDir = CLAUDE_PROJECTS_DIR;
+
   let removed = 0;
   for (const name of staleNames) {
     try {
-      fs.rmSync(path.join(claudeProjectsDir, name), { recursive: true });
+      fs.rmSync(path.join(CLAUDE_PROJECTS_DIR, name), { recursive: true });
       removed++;
     } catch {
       // ignore
@@ -2007,11 +1994,7 @@ export default function Command() {
                   (preset) => (
                     <Action
                       key={preset}
-                      title={
-                        t[
-                          `perm${preset.charAt(0).toUpperCase() + preset.slice(1)}` as keyof I18nStrings
-                        ] as string
-                      }
+                      title={getPresetDisplay(preset, t).label}
                       onAction={() => {
                         let count = 0;
                         for (const p of projects) {
@@ -2058,12 +2041,6 @@ export default function Command() {
                     title: t.cleanupDone(removed),
                   });
                 }}
-              />
-              <Action
-                title={t.configureApi}
-                icon={Icon.Key}
-                shortcut={{ modifiers: ["cmd", "shift"], key: "a" }}
-                onAction={openExtensionPreferences}
               />
               <Action
                 title={t.refresh}
