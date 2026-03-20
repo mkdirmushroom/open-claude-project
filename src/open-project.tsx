@@ -1549,7 +1549,9 @@ end tell`;
     }
 
     case "ghostty": {
-      spawnSync("open", ["-na", "Ghostty.app", "--args", "-e", "bash", "-c", fullCmd]);
+      const tmpScript = `/tmp/claude-ghostty-${Date.now()}.sh`;
+      fs.writeFileSync(tmpScript, `#!/bin/zsh -l\n${fullCmd}\n`, { mode: 0o755 });
+      spawnSync("open", ["-na", "Ghostty.app", "--args", "-e", tmpScript]);
       showToast({
         style: Toast.Style.Success,
         title: t.openedInTerminal,
