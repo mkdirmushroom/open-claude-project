@@ -1536,21 +1536,21 @@ end tell`;
     }
 
     case "ghostty": {
-      // Use clipboard paste instead of keystroke to avoid focus-loss cascade
-      spawnSync("bash", ["-c", `echo -n '${shellEscape(fullCmd)}' | pbcopy`]);
-      script = `
-tell application "Ghostty" to activate
-delay 0.5
-tell application "System Events"
-  tell process "Ghostty"
-    keystroke "n" using command down
-    delay 0.3
-    keystroke "v" using command down
-    delay 0.1
-    keystroke return
-  end tell
-end tell`;
-      break;
+      // AppleScript keystroke is unreliable for Ghostty (focus race with Raycast).
+      // Use temp script + CLI launch instead.
+      const tmpScript = `/tmp/claude-ghostty-${Date.now()}.sh`;
+      fs.writeFileSync(
+        tmpScript,
+        `#!/bin/zsh -l\n${fullCmd}\nexec zsh -l\n`,
+        { mode: 0o755 },
+      );
+      spawnSync("open", ["-na", "Ghostty.app", "--args", "-e", tmpScript]);
+      showToast({
+        style: Toast.Style.Success,
+        title: t.openedInTerminal,
+        message: path.basename(projectPath),
+      });
+      return;
     }
 
     default:
