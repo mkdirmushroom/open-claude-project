@@ -1536,6 +1536,8 @@ end tell`;
     }
 
     case "ghostty": {
+      // Use clipboard paste instead of keystroke to avoid focus-loss cascade
+      spawnSync("bash", ["-c", `echo -n '${shellEscape(fullCmd)}' | pbcopy`]);
       script = `
 tell application "Ghostty" to activate
 delay 0.5
@@ -1543,7 +1545,8 @@ tell application "System Events"
   tell process "Ghostty"
     keystroke "n" using command down
     delay 0.3
-    keystroke "${appleScriptCmd}"
+    keystroke "v" using command down
+    delay 0.1
     keystroke return
   end tell
 end tell`;
