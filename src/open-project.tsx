@@ -1541,7 +1541,7 @@ end tell`;
       const tmpScript = `/tmp/claude-ghostty-${Date.now()}.sh`;
       fs.writeFileSync(
         tmpScript,
-        `#!/bin/zsh -l\n${fullCmd}\nexec zsh -l\n`,
+        `#!/bin/zsh\nsource ~/.zshrc 2>/dev/null\n${fullCmd}\nexec zsh -l\n`,
         { mode: 0o755 },
       );
       spawnSync("open", ["-na", "Ghostty.app", "--args", "-e", tmpScript]);
