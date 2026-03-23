@@ -13,7 +13,7 @@ A [Raycast](https://raycast.com) extension to quickly open recent [Claude Code](
 - **Quick Shortcuts** - `Cmd+1/2/3` to instantly open top 3 projects
 - **Permission Management** - Per-project Claude Code permission presets and a visual rule editor
 - **IDE Integration** - Open projects directly in VS Code, Cursor, Zed, or WebStorm
-- **Session Picker** - Browse and resume specific sessions, not just the latest
+- **Session Picker** - Browse and resume specific sessions with AI-generated titles
 - **Project Cleanup** - Remove stale project entries with one click
 - **Batch Permissions** - Apply a permission preset to all projects at once
 - **Bilingual** - English and Chinese interface
@@ -79,7 +79,7 @@ All presets include deny rules for dangerous operations (`rm -rf`, `sudo`, `git 
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| Terminal App | Choose your preferred terminal | iTerm |
+| Terminal App | Choose your preferred terminal (iTerm, Terminal, Warp, Alacritty, Kitty, Ghostty) | iTerm |
 | Group by Time | Organize projects by time periods | Enabled |
 | Favorites First | Show favorited projects at the top | Enabled |
 | Language | Interface language (English/中文) | English |

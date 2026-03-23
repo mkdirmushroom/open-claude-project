@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.3.0] - 2026-03-23
+
+### Added
+- Session titles: show AI-generated conversation summaries (like `claude --resume`) instead of plain timestamps
+- Filter out ghost sessions (file-history-snapshot only files) from session picker
+- Async session loading with `useCachedPromise` and loading indicator
+- `_preset` metadata for stable preset detection across sessions
+- `readSettings()` / `resolveDefaultMode()` shared helpers
+
+### Fixed
+- **Ghostty/Warp cascade bug**: AppleScript keystroke leaked to Raycast when terminal lost focus, causing multiple projects to open simultaneously. Replaced with temp script + CLI launch
+- **Kitty PATH issue**: `bash -c` couldn't find `claude`; switched to `zsh -lc` with `source ~/.zshrc`
+- **Ghostty PATH issue**: `#!/bin/zsh -l` is non-interactive and doesn't source `~/.zshrc` where `~/.local/bin` is added to PATH
+- **`defaultMode` placement**: was written at JSON top level instead of inside `permissions` object, causing Claude Code to ignore permission modes
+- **Preset detection instability**: "don't ask again" rules from Claude Code caused presets to show as "custom"; now uses `_preset` metadata instead of rule matching
+- **PermissionEditor clears `_preset`**: manually editing rules correctly transitions to "custom"
+- Removed duplicate `configureApi` action (identical to `openPreferences`)
+- Removed redundant `claudeProjectsDir` aliases
+- TOCTOU: removed `existsSync` before idempotent `saveSettings`
+
+### Improved
+- Extracted `grepJsonl()` helper for session file scanning
+- `writePermissionPreset` / `saveSettings` / `resetPermissions` all use `getSettingsPath()` and `readSettings()`
+- Replaced stringly-typed i18n key construction with `getPresetDisplay()`
+- All 6 terminals now use reliable launch methods (no more `keystroke` for command input)
+
 ## [1.2.0] - 2026-03-17
 
 ### Added
