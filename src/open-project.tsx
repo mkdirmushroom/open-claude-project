@@ -1493,19 +1493,23 @@ tell application "Terminal"
 end tell`;
       break;
 
-    case "warp":
-      script = `
-tell application "Warp"
-  activate
-end tell
-delay 0.5
-tell application "System Events"
-  keystroke "t" using command down
-  delay 0.3
-  keystroke "${appleScriptCmd}"
-  keystroke return
-end tell`;
-      break;
+    case "warp": {
+      // Warp has no native AppleScript API or CLI -e flag.
+      // Use temp script + open to avoid keystroke focus-race cascade.
+      const warpScript = `/tmp/claude-warp-${Date.now()}.sh`;
+      fs.writeFileSync(
+        warpScript,
+        `#!/bin/zsh\nsource ~/.zshrc 2>/dev/null\n${fullCmd}\nexec zsh -l\n`,
+        { mode: 0o755 },
+      );
+      spawnSync("open", ["-a", "Warp", warpScript]);
+      showToast({
+        style: Toast.Style.Success,
+        title: t.openedInTerminal,
+        message: path.basename(projectPath),
+      });
+      return;
+    }
 
     case "alacritty":
       spawnSync("open", ["-a", "Alacritty"]);
@@ -1523,9 +1527,9 @@ end tell`;
         "--single-instance",
         "--directory",
         projectPath,
-        "bash",
-        "-c",
-        kittyCmd,
+        "zsh",
+        "-lc",
+        `source ~/.zshrc 2>/dev/null; ${kittyCmd}; exec zsh -l`,
       ]);
       showToast({
         style: Toast.Style.Success,
