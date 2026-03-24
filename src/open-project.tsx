@@ -1006,8 +1006,23 @@ function writePermissionPreset(projectPath: string, presetName: string): void {
   fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
   const settings = readSettings(projectPath);
   const preset = PERMISSION_PRESETS[presetName];
+
+  // Preserve user-added rules (from "don't ask again") across preset switches
+  const oldPerms = (settings.permissions as Record<string, unknown>) || {};
+  const oldAllow: string[] = (oldPerms.allow as string[]) || [];
+  const oldDeny: string[] = (oldPerms.deny as string[]) || [];
+  const oldPresetName = settings._preset as string | undefined;
+  const oldPreset = oldPresetName ? PERMISSION_PRESETS[oldPresetName] : undefined;
+  const oldPresetAllow = new Set(oldPreset?.allow || []);
+  const oldPresetDeny = new Set(oldPreset?.deny || []);
+  const userAllow = oldAllow.filter((r) => !oldPresetAllow.has(r));
+  const userDeny = oldDeny.filter((r) => !oldPresetDeny.has(r));
+
+  const newAllow = [...preset.allow, ...userAllow.filter((r) => !preset.allow.includes(r))];
+  const newDeny = [...preset.deny, ...userDeny.filter((r) => !preset.deny.includes(r))];
+
   delete settings.defaultMode;
-  const perms: Record<string, unknown> = { allow: preset.allow, deny: preset.deny };
+  const perms: Record<string, unknown> = { allow: newAllow, deny: newDeny };
   if (preset.defaultMode) {
     perms.defaultMode = preset.defaultMode;
   }
