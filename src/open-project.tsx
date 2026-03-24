@@ -1607,7 +1607,8 @@ end tell`;
 
     case "ghostty": {
       const tmpScript = writeTempScript("ghostty", fullCmd);
-      const child = spawn("ghostty", ["-e", tmpScript], {
+      const ghosttyBin = "/Applications/Ghostty.app/Contents/MacOS/ghostty";
+      const child = spawn(ghosttyBin, ["-e", tmpScript], {
         stdio: "ignore",
         detached: true,
       });
