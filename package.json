@@ -76,7 +76,8 @@
         { "title": "None", "value": "" },
         { "title": "Strict", "value": "strict" },
         { "title": "Standard", "value": "standard" },
-        { "title": "Permissive", "value": "permissive" }
+        { "title": "Permissive", "value": "permissive" },
+        { "title": "Dangerously Skip Permissions", "value": "dangerouslySkipPermissions" }
       ]
     },
     {

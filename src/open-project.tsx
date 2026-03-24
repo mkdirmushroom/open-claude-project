@@ -97,6 +97,11 @@ const PERMISSION_PRESETS: Record<string, PresetConfig> = {
     ],
     deny: DENY_DANGEROUS,
   },
+  dangerouslySkipPermissions: {
+    defaultMode: "bypassPermissions",
+    allow: [],
+    deny: [],
+  },
 };
 
 interface CatalogRule {
@@ -602,6 +607,8 @@ const i18n = {
     permStrictDesc: "只读 + 保护敏感文件",
     permStandardDesc: "自动接受编辑 + 常用命令",
     permPermissiveDesc: "自动接受编辑 + 全部命令",
+    permDangerouslySkipPermissions: "跳过全部权限",
+    permDangerouslySkipPermissionsDesc: "跳过所有权限检查（仅限容器/VM）",
     permApplied: "已应用权限模式",
     permOpenEditor: "在编辑器中编辑权限",
     permReset: "恢复默认",
@@ -690,6 +697,8 @@ const i18n = {
     permStrictDesc: "Read-only + protect sensitive files",
     permStandardDesc: "Auto-accept edits + common commands",
     permPermissiveDesc: "Auto-accept edits + all commands",
+    permDangerouslySkipPermissions: "Skip All Permissions",
+    permDangerouslySkipPermissionsDesc: "Bypass all permission checks (containers/VMs only)",
     permApplied: "Permission mode applied",
     permOpenEditor: "Edit Permissions in Editor",
     permReset: "Reset to Default",
@@ -748,7 +757,7 @@ interface Preferences {
   groupByTime: boolean;
   showFavoritesFirst: boolean;
   language: Language;
-  defaultPreset?: "" | "strict" | "standard" | "permissive";
+  defaultPreset?: "" | "strict" | "standard" | "permissive" | "dangerouslySkipPermissions";
   ideApp?: "" | "code" | "cursor" | "zed" | "webstorm";
   anthropicBaseUrl?: string;
   anthropicApiKey?: string;
@@ -768,6 +777,7 @@ type PermissionPreset =
   | "strict"
   | "standard"
   | "permissive"
+  | "dangerouslySkipPermissions"
   | "custom"
   | "default";
 
@@ -1026,6 +1036,8 @@ function getPresetDisplay(
       return { label: t.permStandard, color: Color.Green };
     case "permissive":
       return { label: t.permPermissive, color: Color.Orange };
+    case "dangerouslySkipPermissions":
+      return { label: t.permDangerouslySkipPermissions, color: Color.Red };
     case "custom":
       return { label: t.permCustom, color: Color.Purple };
     default:
@@ -1948,6 +1960,11 @@ export default function Command() {
                       label: t.permPermissive,
                       desc: t.permPermissiveDesc,
                     },
+                    {
+                      key: "dangerouslySkipPermissions",
+                      label: t.permDangerouslySkipPermissions,
+                      desc: t.permDangerouslySkipPermissionsDesc,
+                    },
                   ] as const
                 ).map((p) => (
                   <Action
@@ -1997,7 +2014,7 @@ export default function Command() {
                 title={t.batchApply}
                 icon={Icon.BulletPoints}
               >
-                {(["strict", "standard", "permissive"] as const).map(
+                {(["strict", "standard", "permissive", "dangerouslySkipPermissions"] as const).map(
                   (preset) => (
                     <Action
                       key={preset}
