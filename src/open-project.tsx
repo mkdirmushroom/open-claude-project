@@ -1499,7 +1499,7 @@ function writeTempScript(prefix: string, cmd: string): string {
   const scriptPath = path.join(dir, "run.sh");
   fs.writeFileSync(
     scriptPath,
-    `#!/bin/zsh\nsource ~/.zshrc 2>/dev/null\n${cmd}\nexec zsh -l\n`,
+    `#!/bin/zsh\nsource ~/.zshrc 2>/dev/null\n${cmd}\nrm -f "$0" && rmdir "$(dirname "$0")" 2>/dev/null\nexec zsh -l\n`,
     { mode: 0o700 },
   );
   return scriptPath;
@@ -1606,17 +1606,26 @@ end tell`;
     }
 
     case "ghostty": {
-      const tmpScript = writeTempScript("ghostty", fullCmd);
-      spawnSync("open", ["-a", "Ghostty", tmpScript]);
-      setTimeout(() => {
-        try { fs.unlinkSync(tmpScript); fs.rmdirSync(path.dirname(tmpScript)); } catch { /* ok */ }
-      }, 5000);
-      showToast({
-        style: Toast.Style.Success,
-        title: t.openedInTerminal,
-        message: path.basename(projectPath),
-      });
-      return;
+      // Ghostty 1.3+ native AppleScript API — no temp scripts or keystroke hacks
+      const envList = [];
+      if (anthropicBaseUrl?.trim())
+        envList.push(`"ANTHROPIC_BASE_URL=${anthropicBaseUrl}"`);
+      if (anthropicApiKey?.trim())
+        envList.push(`"ANTHROPIC_API_KEY=${anthropicApiKey}"`);
+      const envLine = envList.length
+        ? `set environment variables of cfg to {${envList.join(", ")}}\n`
+        : "";
+      script = `
+tell application "Ghostty"
+  activate
+  set cfg to new surface configuration
+  set initial working directory of cfg to "${escapeForAppleScript(projectPath)}"
+  ${envLine}set win to new window with configuration cfg
+  set pane to first pane of first tab of win
+  input text "${escapeForAppleScript(claudeCmd)}" to pane
+  send key "enter" to pane
+end tell`;
+      break;
     }
 
     default:
