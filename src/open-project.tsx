@@ -1607,14 +1607,10 @@ end tell`;
 
     case "ghostty": {
       const tmpScript = writeTempScript("ghostty", fullCmd);
-      const ghosttyBin = "/Applications/Ghostty.app/Contents/MacOS/ghostty";
-      const child = spawn(ghosttyBin, ["-e", tmpScript], {
-        stdio: "ignore",
-        detached: true,
-      });
-      child.unref();
-      // Clean up temp script after Ghostty reads it
-      setTimeout(() => { try { fs.unlinkSync(tmpScript); } catch { /* ok */ } }, 5000);
+      spawnSync("open", ["-a", "Ghostty", tmpScript]);
+      setTimeout(() => {
+        try { fs.unlinkSync(tmpScript); fs.rmdirSync(path.dirname(tmpScript)); } catch { /* ok */ }
+      }, 5000);
       showToast({
         style: Toast.Style.Success,
         title: t.openedInTerminal,
