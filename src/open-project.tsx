@@ -1617,7 +1617,7 @@ tell application "Ghostty"
   activate
   set cfg to new surface configuration
   set initial working directory of cfg to "${escapeForAppleScript(projectPath)}"
-  set command of cfg to "${escapeForAppleScript(claudeCmd)}"
+  set command of cfg to "zsh -lc \\"source ~/.zshrc 2>/dev/null; ${escapeForAppleScript(claudeCmd)}\\""
   set wait after command of cfg to true${envPart}
   set win to new window with configuration cfg
 end tell`;
