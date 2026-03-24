@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.1] - 2026-03-24
+
+### Added
+- **Dangerously Skip Permissions** preset — bypasses all permission checks (`defaultMode: "bypassPermissions"`), shown in red, for containers/VMs only
+
 ## [1.3.0] - 2026-03-23
 
 ### Added
