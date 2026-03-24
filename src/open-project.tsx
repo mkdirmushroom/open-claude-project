@@ -15,7 +15,7 @@ import {
 } from "@raycast/api";
 import { useCachedPromise, useLocalStorage } from "@raycast/utils";
 import { useState } from "react";
-import { spawnSync } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -1607,7 +1607,11 @@ end tell`;
         `#!/bin/zsh\nsource ~/.zshrc 2>/dev/null\n${fullCmd}\nexec zsh -l\n`,
         { mode: 0o755 },
       );
-      spawnSync("open", ["-na", "Ghostty.app", "--args", "-e", tmpScript]);
+      const child = spawn("ghostty", ["-e", tmpScript], {
+        stdio: "ignore",
+        detached: true,
+      });
+      child.unref();
       showToast({
         style: Toast.Style.Success,
         title: t.openedInTerminal,
