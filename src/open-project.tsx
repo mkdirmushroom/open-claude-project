@@ -2071,15 +2071,16 @@ export default function Command() {
                       title={getPresetDisplay(preset, t).label}
                       onAction={async () => {
                         const targets = projects.filter((p) => p.permissionPreset !== preset);
-                        const hasUserRules = targets.some((p) => {
+                        let totalUserRules = 0;
+                        for (const p of targets) {
                           const r = getUserAddedRules(p.fullPath);
-                          return r.allow.length + r.deny.length > 0;
-                        });
+                          totalUserRules += r.allow.length + r.deny.length;
+                        }
                         let preserve = false;
-                        if (hasUserRules) {
+                        if (totalUserRules > 0) {
                           preserve = await confirmAlert({
                             title: t.preserveRulesTitle,
-                            message: t.preserveRulesMessage(targets.length),
+                            message: t.preserveRulesMessage(totalUserRules),
                             primaryAction: { title: t.preserveRulesKeep },
                             dismissAction: { title: t.preserveRulesDiscard },
                           });
