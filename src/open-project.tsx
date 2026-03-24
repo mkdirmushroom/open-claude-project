@@ -641,6 +641,11 @@ const i18n = {
     cleanupNone: "没有需要清理的项目",
     cleanupConfirm: "确定要清理无效项目吗？",
     // Batch
+    preserveRulesTitle: "保留自定义规则？",
+    preserveRulesMessage: (n: number) =>
+      `检测到 ${n} 条通过"不再询问"添加的规则。是否在切换预设后保留？`,
+    preserveRulesKeep: "保留",
+    preserveRulesDiscard: "丢弃",
     batchApply: "批量应用权限",
     batchApplyDone: (n: number) => `已应用到 ${n} 个项目`,
   },
@@ -732,6 +737,11 @@ const i18n = {
     cleanupNone: "No stale projects found",
     cleanupConfirm: "Clean up stale projects?",
     // Batch
+    preserveRulesTitle: "Keep custom rules?",
+    preserveRulesMessage: (n: number) =>
+      `Found ${n} rule${n > 1 ? "s" : ""} added via "don't ask again". Keep after switching preset?`,
+    preserveRulesKeep: "Keep",
+    preserveRulesDiscard: "Discard",
     batchApply: "Batch Apply Permissions",
     batchApplyDone: (n: number) => `Applied to ${n} project${n > 1 ? "s" : ""}`,
   },
@@ -1001,25 +1011,39 @@ function readSettings(projectPath: string): Record<string, unknown> {
   }
 }
 
-function writePermissionPreset(projectPath: string, presetName: string): void {
+function getUserAddedRules(projectPath: string): { allow: string[]; deny: string[] } {
+  const settings = readSettings(projectPath);
+  const perms = (settings.permissions as Record<string, unknown>) || {};
+  const allow: string[] = (perms.allow as string[]) || [];
+  const deny: string[] = (perms.deny as string[]) || [];
+  const presetName = settings._preset as string | undefined;
+  const preset = presetName ? PERMISSION_PRESETS[presetName] : undefined;
+  const presetAllow = new Set(preset?.allow || []);
+  const presetDeny = new Set(preset?.deny || []);
+  return {
+    allow: allow.filter((r) => !presetAllow.has(r)),
+    deny: deny.filter((r) => !presetDeny.has(r)),
+  };
+}
+
+function writePermissionPreset(
+  projectPath: string,
+  presetName: string,
+  preserveUserRules = false,
+): void {
   const settingsPath = getSettingsPath(projectPath);
   fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
   const settings = readSettings(projectPath);
   const preset = PERMISSION_PRESETS[presetName];
 
-  // Preserve user-added rules (from "don't ask again") across preset switches
-  const oldPerms = (settings.permissions as Record<string, unknown>) || {};
-  const oldAllow: string[] = (oldPerms.allow as string[]) || [];
-  const oldDeny: string[] = (oldPerms.deny as string[]) || [];
-  const oldPresetName = settings._preset as string | undefined;
-  const oldPreset = oldPresetName ? PERMISSION_PRESETS[oldPresetName] : undefined;
-  const oldPresetAllow = new Set(oldPreset?.allow || []);
-  const oldPresetDeny = new Set(oldPreset?.deny || []);
-  const userAllow = oldAllow.filter((r) => !oldPresetAllow.has(r));
-  const userDeny = oldDeny.filter((r) => !oldPresetDeny.has(r));
+  let newAllow = [...preset.allow];
+  let newDeny = [...preset.deny];
 
-  const newAllow = [...preset.allow, ...userAllow.filter((r) => !preset.allow.includes(r))];
-  const newDeny = [...preset.deny, ...userDeny.filter((r) => !preset.deny.includes(r))];
+  if (preserveUserRules) {
+    const userRules = getUserAddedRules(projectPath);
+    newAllow = [...newAllow, ...userRules.allow.filter((r) => !preset.allow.includes(r))];
+    newDeny = [...newDeny, ...userRules.deny.filter((r) => !preset.deny.includes(r))];
+  }
 
   delete settings.defaultMode;
   const perms: Record<string, unknown> = { allow: newAllow, deny: newDeny };
@@ -1990,8 +2014,19 @@ export default function Command() {
                         ? Icon.CheckCircle
                         : Icon.Circle
                     }
-                    onAction={() => {
-                      writePermissionPreset(project.fullPath, p.key);
+                    onAction={async () => {
+                      const userRules = getUserAddedRules(project.fullPath);
+                      const userRuleCount = userRules.allow.length + userRules.deny.length;
+                      let preserve = false;
+                      if (userRuleCount > 0) {
+                        preserve = await confirmAlert({
+                          title: t.preserveRulesTitle,
+                          message: t.preserveRulesMessage(userRuleCount),
+                          primaryAction: { title: t.preserveRulesKeep },
+                          dismissAction: { title: t.preserveRulesDiscard },
+                        });
+                      }
+                      writePermissionPreset(project.fullPath, p.key, preserve);
                       revalidate();
                       showToast({
                         style: Toast.Style.Success,
@@ -2034,13 +2069,25 @@ export default function Command() {
                     <Action
                       key={preset}
                       title={getPresetDisplay(preset, t).label}
-                      onAction={() => {
+                      onAction={async () => {
+                        const targets = projects.filter((p) => p.permissionPreset !== preset);
+                        const hasUserRules = targets.some((p) => {
+                          const r = getUserAddedRules(p.fullPath);
+                          return r.allow.length + r.deny.length > 0;
+                        });
+                        let preserve = false;
+                        if (hasUserRules) {
+                          preserve = await confirmAlert({
+                            title: t.preserveRulesTitle,
+                            message: t.preserveRulesMessage(targets.length),
+                            primaryAction: { title: t.preserveRulesKeep },
+                            dismissAction: { title: t.preserveRulesDiscard },
+                          });
+                        }
                         let count = 0;
-                        for (const p of projects) {
-                          if (p.permissionPreset !== preset) {
-                            writePermissionPreset(p.fullPath, preset);
-                            count++;
-                          }
+                        for (const p of targets) {
+                          writePermissionPreset(p.fullPath, preset, preserve);
+                          count++;
                         }
                         revalidate();
                         showToast({
