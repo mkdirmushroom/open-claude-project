@@ -1604,23 +1604,22 @@ end tell`;
     }
 
     case "ghostty": {
-      const envList: string[] = [];
+      const envLines: string[] = [];
       if (anthropicBaseUrl?.trim())
-        envList.push(`"ANTHROPIC_BASE_URL=${escapeForAppleScript(anthropicBaseUrl)}"`);
+        envLines.push(`"ANTHROPIC_BASE_URL=${escapeForAppleScript(anthropicBaseUrl)}"`);
       if (anthropicApiKey?.trim())
-        envList.push(`"ANTHROPIC_API_KEY=${escapeForAppleScript(anthropicApiKey)}"`);
-      const envLine = envList.length
-        ? `set environment variables of cfg to {${envList.join(", ")}}\n`
+        envLines.push(`"ANTHROPIC_API_KEY=${escapeForAppleScript(anthropicApiKey)}"`);
+      const envPart = envLines.length
+        ? `\n  set environment variables of cfg to {${envLines.join(", ")}}`
         : "";
       script = `
 tell application "Ghostty"
   activate
   set cfg to new surface configuration
   set initial working directory of cfg to "${escapeForAppleScript(projectPath)}"
-  ${envLine}set win to new window with configuration cfg
-  set pane to first pane of first tab of win
-  input text "${escapeForAppleScript(claudeCmd)}" to pane
-  send key "enter" to pane
+  set command of cfg to "${escapeForAppleScript(claudeCmd)}"
+  set wait after command of cfg to true${envPart}
+  set win to new window with configuration cfg
 end tell`;
       break;
     }
