@@ -991,13 +991,9 @@ function resolveDefaultMode(settings: Record<string, unknown>): string | undefin
 
 function detectPreset(projectPath: string): PermissionPreset {
   const settings = readSettings(projectPath);
-  // Stored preset metadata (written by Raycast, not affected by "don't ask again")
   const stored = settings._preset as string | undefined;
   if (stored && stored in PERMISSION_PRESETS) return stored as PermissionPreset;
-  // No metadata: check if any rules exist at all
-  const permsObj = (settings.permissions as Record<string, unknown>) || {};
-  const allow: string[] = (permsObj.allow as string[]) || [];
-  const deny: string[] = (permsObj.deny as string[]) || [];
+  const { allow, deny } = parsePermissions(settings);
   const mode = resolveDefaultMode(settings);
   if (allow.length === 0 && deny.length === 0 && !mode) return "default";
   return "custom";
@@ -1011,11 +1007,20 @@ function readSettings(projectPath: string): Record<string, unknown> {
   }
 }
 
+function parsePermissions(settings: Record<string, unknown>): {
+  allow: string[];
+  deny: string[];
+} {
+  const perms = (settings.permissions as Record<string, unknown>) || {};
+  return {
+    allow: (perms.allow as string[]) || [],
+    deny: (perms.deny as string[]) || [],
+  };
+}
+
 function getUserAddedRules(projectPath: string): { allow: string[]; deny: string[] } {
   const settings = readSettings(projectPath);
-  const perms = (settings.permissions as Record<string, unknown>) || {};
-  const allow: string[] = (perms.allow as string[]) || [];
-  const deny: string[] = (perms.deny as string[]) || [];
+  const { allow, deny } = parsePermissions(settings);
   const presetName = settings._preset as string | undefined;
   const preset = presetName ? PERMISSION_PRESETS[presetName] : undefined;
   const presetAllow = new Set(preset?.allow || []);
@@ -1040,9 +1045,13 @@ function writePermissionPreset(
   let newDeny = [...preset.deny];
 
   if (preserveUserRules) {
-    const userRules = getUserAddedRules(projectPath);
-    newAllow = [...newAllow, ...userRules.allow.filter((r) => !preset.allow.includes(r))];
-    newDeny = [...newDeny, ...userRules.deny.filter((r) => !preset.deny.includes(r))];
+    // getUserAddedRules already excludes old preset rules, no need to re-filter
+    const { allow, deny } = parsePermissions(settings);
+    const oldPreset = PERMISSION_PRESETS[settings._preset as string] || { allow: [], deny: [] };
+    const oldAllowSet = new Set(oldPreset.allow);
+    const oldDenySet = new Set(oldPreset.deny);
+    for (const r of allow) if (!oldAllowSet.has(r) && !preset.allow.includes(r)) newAllow.push(r);
+    for (const r of deny) if (!oldDenySet.has(r) && !preset.deny.includes(r)) newDeny.push(r);
   }
 
   delete settings.defaultMode;
@@ -1182,9 +1191,8 @@ function PermissionEditor({
     readSettings(projectPath),
   );
 
+  const { allow, deny } = parsePermissions(settings);
   const perms = (settings.permissions as Record<string, unknown>) || {};
-  const allow: string[] = (perms.allow as string[]) || [];
-  const deny: string[] = (perms.deny as string[]) || [];
   const currentMode = resolveDefaultMode(settings) || "default";
 
   // Find rules not in the catalog
@@ -2085,15 +2093,13 @@ export default function Command() {
                             dismissAction: { title: t.preserveRulesDiscard },
                           });
                         }
-                        let count = 0;
                         for (const p of targets) {
                           writePermissionPreset(p.fullPath, preset, preserve);
-                          count++;
                         }
                         revalidate();
                         showToast({
                           style: Toast.Style.Success,
-                          title: t.batchApplyDone(count),
+                          title: t.batchApplyDone(targets.length),
                         });
                       }}
                     />
