@@ -640,6 +640,7 @@ const i18n = {
     cleanupDone: (n: number) => `已清理 ${n} 个无效项目`,
     cleanupNone: "没有需要清理的项目",
     cleanupConfirm: "确定要清理无效项目吗？",
+    cleanupConfirmMessage: (n: number) => `将删除 ${n} 个无效项目目录`,
     // Batch
     preserveRulesTitle: "保留自定义规则？",
     preserveRulesMessage: (n: number) =>
@@ -736,6 +737,7 @@ const i18n = {
       `Cleaned up ${n} stale project${n > 1 ? "s" : ""}`,
     cleanupNone: "No stale projects found",
     cleanupConfirm: "Clean up stale projects?",
+    cleanupConfirmMessage: (n: number) => `Will remove ${n} stale project director${n > 1 ? "ies" : "y"}`,
     // Batch
     preserveRulesTitle: "Keep custom rules?",
     preserveRulesMessage: (n: number) =>
@@ -1492,6 +1494,17 @@ function escapeForAppleScript(str: string): string {
 }
 
 // Build export commands for environment variables
+function writeTempScript(prefix: string, cmd: string): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `claude-${prefix}-`));
+  const scriptPath = path.join(dir, "run.sh");
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/zsh\nsource ~/.zshrc 2>/dev/null\n${cmd}\nexec zsh -l\n`,
+    { mode: 0o700 },
+  );
+  return scriptPath;
+}
+
 function buildEnvExports(
   anthropicBaseUrl?: string,
   anthropicApiKey?: string,
@@ -1553,15 +1566,9 @@ end tell`;
       break;
 
     case "warp": {
-      // Warp has no native AppleScript API or CLI -e flag.
-      // Use temp script + open to avoid keystroke focus-race cascade.
-      const warpScript = `/tmp/claude-warp-${Date.now()}.sh`;
-      fs.writeFileSync(
-        warpScript,
-        `#!/bin/zsh\nsource ~/.zshrc 2>/dev/null\n${fullCmd}\nexec zsh -l\n`,
-        { mode: 0o755 },
-      );
+      const warpScript = writeTempScript("warp", fullCmd);
       spawnSync("open", ["-a", "Warp", warpScript]);
+      try { fs.unlinkSync(warpScript); } catch { /* already gone */ }
       showToast({
         style: Toast.Style.Success,
         title: t.openedInTerminal,
@@ -1572,7 +1579,7 @@ end tell`;
 
     case "alacritty":
       spawnSync("open", ["-a", "Alacritty"]);
-      spawnSync("bash", ["-c", `echo '${fullCmd}' | pbcopy`]);
+      spawnSync("pbcopy", [], { input: fullCmd });
       showToast({
         style: Toast.Style.Success,
         title: t.copiedToClipboard,
@@ -1599,19 +1606,14 @@ end tell`;
     }
 
     case "ghostty": {
-      // AppleScript keystroke is unreliable for Ghostty (focus race with Raycast).
-      // Use temp script + CLI launch instead.
-      const tmpScript = `/tmp/claude-ghostty-${Date.now()}.sh`;
-      fs.writeFileSync(
-        tmpScript,
-        `#!/bin/zsh\nsource ~/.zshrc 2>/dev/null\n${fullCmd}\nexec zsh -l\n`,
-        { mode: 0o755 },
-      );
+      const tmpScript = writeTempScript("ghostty", fullCmd);
       const child = spawn("ghostty", ["-e", tmpScript], {
         stdio: "ignore",
         detached: true,
       });
       child.unref();
+      // Clean up temp script after Ghostty reads it
+      setTimeout(() => { try { fs.unlinkSync(tmpScript); } catch { /* ok */ } }, 5000);
       showToast({
         style: Toast.Style.Success,
         title: t.openedInTerminal,
@@ -1647,16 +1649,11 @@ function showInFinder(projectPath: string) {
   spawnSync("open", ["-R", projectPath]);
 }
 
+const KNOWN_IDES = new Set(["code", "cursor", "zed", "webstorm"]);
+
 function openInIde(projectPath: string, ide: string, t: I18nStrings) {
-  const cmds: Record<string, string[]> = {
-    code: ["code", projectPath],
-    cursor: ["cursor", projectPath],
-    zed: ["zed", projectPath],
-    webstorm: ["webstorm", projectPath],
-  };
-  const cmd = cmds[ide];
-  if (!cmd) return;
-  const result = spawnSync(cmd[0], cmd.slice(1));
+  if (!KNOWN_IDES.has(ide)) return;
+  const result = spawnSync(ide, [projectPath]);
   if (result.status === 0 || result.status === null) {
     showToast({
       style: Toast.Style.Success,
@@ -1800,11 +1797,11 @@ function removeStaleProjects(staleNames: string[]): number {
 // Keyboard Shortcuts
 // ============================================================================
 
+const QUICK_KEYS = ["1", "2", "3"] as const;
+
 function getQuickShortcut(idx: number) {
-  if (idx === 0) return { modifiers: ["cmd"] as ["cmd"], key: "1" as const };
-  if (idx === 1) return { modifiers: ["cmd"] as ["cmd"], key: "2" as const };
-  if (idx === 2) return { modifiers: ["cmd"] as ["cmd"], key: "3" as const };
-  return undefined;
+  const key = QUICK_KEYS[idx];
+  return key ? { modifiers: ["cmd"] as ["cmd"], key } : undefined;
 }
 
 // ============================================================================
@@ -2124,7 +2121,7 @@ export default function Command() {
                   }
                   const confirmed = await confirmAlert({
                     title: t.cleanupConfirm,
-                    message: t.cleanupDone(stale.length),
+                    message: t.cleanupConfirmMessage(stale.length),
                     primaryAction: {
                       title: t.cleanupStale,
                       style: Alert.ActionStyle.Destructive,
