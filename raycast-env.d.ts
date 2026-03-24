@@ -17,7 +17,7 @@ type ExtensionPreferences = {
   /** Language / 语言 - Choose display language / 选择显示语言 */
   "language": "zh" | "en",
   /** Default Permission Preset - Auto-apply this preset to new projects without permissions */
-  "defaultPreset": "" | "strict" | "standard" | "permissive",
+  "defaultPreset": "" | "strict" | "standard" | "permissive" | "dangerouslySkipPermissions",
   /** IDE App - Choose which IDE to open projects in (adds an action to the list) */
   "ideApp": "" | "code" | "cursor" | "zed" | "webstorm",
   /** Anthropic Base URL - Custom API base URL (e.g., https://api.kimi.com/coding/) - Optional */
