@@ -1493,7 +1493,6 @@ function escapeForAppleScript(str: string): string {
   return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-// Build export commands for environment variables
 function writeTempScript(prefix: string, cmd: string): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `claude-${prefix}-`));
   const scriptPath = path.join(dir, "run.sh");
@@ -1568,7 +1567,6 @@ end tell`;
     case "warp": {
       const warpScript = writeTempScript("warp", fullCmd);
       spawnSync("open", ["-a", "Warp", warpScript]);
-      try { fs.unlinkSync(warpScript); } catch { /* already gone */ }
       showToast({
         style: Toast.Style.Success,
         title: t.openedInTerminal,
@@ -1606,12 +1604,11 @@ end tell`;
     }
 
     case "ghostty": {
-      // Ghostty 1.3+ native AppleScript API — no temp scripts or keystroke hacks
-      const envList = [];
+      const envList: string[] = [];
       if (anthropicBaseUrl?.trim())
-        envList.push(`"ANTHROPIC_BASE_URL=${anthropicBaseUrl}"`);
+        envList.push(`"ANTHROPIC_BASE_URL=${escapeForAppleScript(anthropicBaseUrl)}"`);
       if (anthropicApiKey?.trim())
-        envList.push(`"ANTHROPIC_API_KEY=${anthropicApiKey}"`);
+        envList.push(`"ANTHROPIC_API_KEY=${escapeForAppleScript(anthropicApiKey)}"`);
       const envLine = envList.length
         ? `set environment variables of cfg to {${envList.join(", ")}}\n`
         : "";
