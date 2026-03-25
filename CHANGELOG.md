@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.3.2] - 2026-03-25
+
+### Added
+- **Auto Mode** preset — AI classifier automatically allows safe operations and blocks risky ones (`defaultMode: "auto"`)
+- Auto mode option in PermissionEditor mode dropdown
+
+### Fixed
+- Ghostty: use native AppleScript API (1.3+) with `command` property instead of keystroke simulation
+- Ghostty: cold start reuses default window instead of creating an extra empty window
+- Warp: cold start reuses default window to avoid double-window
+- Temp scripts: secure permissions (0o700) + self-delete after execution
+- Alacritty: use `spawnSync("pbcopy", [], {input})` to eliminate shell injection
+- Cleanup confirm dialog: use future-tense message instead of past-tense
+
+### Improved
+- Confirm dialog when switching presets with user-added rules (keep or discard)
+- `writeTempScript()` helper shared by Warp
+- `openInIde()` simplified with `KNOWN_IDES` Set
+- `getQuickShortcut()` simplified with `QUICK_KEYS` array lookup
+
 ## [1.3.1] - 2026-03-24
 
 ### Added

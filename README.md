@@ -52,6 +52,7 @@ Manage Claude Code's `settings.local.json` per project directly from Raycast.
 | Strict | Read-only + sensitive file protection |
 | Standard | Auto-accept edits + common commands (git, npm, etc.) |
 | Permissive | Auto-accept edits + all commands |
+| Auto Mode | AI classifier allows safe operations, blocks risky ones |
 | Dangerously Skip Permissions | Bypass all permission checks (containers/VMs only) |
 
 All presets include deny rules for dangerous operations (`rm -rf`, `sudo`, `git push --force`, `.env` files, private keys).
