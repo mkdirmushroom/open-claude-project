@@ -135,6 +135,11 @@ const MODE_OPTIONS = [
     en: "Auto-accept edits — file changes auto-approved",
   },
   {
+    value: "auto",
+    zh: "自动模式 — AI 判断安全性，危险操作自动阻止",
+    en: "Auto mode — AI classifier allows safe, blocks risky",
+  },
+  {
     value: "plan",
     zh: "计划模式 — 只分析不修改",
     en: "Plan mode — analyze only, no changes",
