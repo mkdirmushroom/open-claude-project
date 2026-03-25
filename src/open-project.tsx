@@ -100,7 +100,7 @@ const PERMISSION_PRESETS: Record<string, PresetConfig> = {
   auto: {
     defaultMode: "auto",
     allow: [],
-    deny: DENY_DANGEROUS,
+    deny: [],
   },
   dangerouslySkipPermissions: {
     defaultMode: "bypassPermissions",
