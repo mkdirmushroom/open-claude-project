@@ -1565,8 +1565,22 @@ end tell`;
       break;
 
     case "warp": {
-      const warpScript = writeTempScript("warp", fullCmd);
-      spawnSync("open", ["-a", "Warp", warpScript]);
+      const warpRunning = spawnSync("pgrep", ["-x", "Warp"], { encoding: "utf-8" }).status === 0;
+      if (warpRunning) {
+        const warpScript = writeTempScript("warp", fullCmd);
+        spawnSync("open", ["-a", "Warp", warpScript]);
+      } else {
+        // Cold start: reuse the default window to avoid double-window
+        spawnSync("osascript", ["-e", `
+tell application "Warp" to activate
+delay 1
+tell application "System Events"
+  tell process "Warp"
+    keystroke "${appleScriptCmd}"
+    keystroke return
+  end tell
+end tell`], { encoding: "utf-8" });
+      }
       showToast({
         style: Toast.Style.Success,
         title: t.openedInTerminal,
