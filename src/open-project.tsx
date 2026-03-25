@@ -1615,15 +1615,19 @@ end tell`;
       script = `
 tell application "Ghostty"
   set wasRunning to it is running
-  launch
-  set cfg to new surface configuration
-  set initial working directory of cfg to "${escapeForAppleScript(projectPath)}"
-  set command of cfg to "zsh -lic \\"source ~/.zshrc 2>/dev/null; ${escapeForAppleScript(claudeCmd)}\\""
-  set wait after command of cfg to true${envPart}
-  set win to new window with configuration cfg
-  activate window win
-  if not wasRunning and (count of windows) > 1 then
-    close window 2
+  if wasRunning then
+    set cfg to new surface configuration
+    set initial working directory of cfg to "${escapeForAppleScript(projectPath)}"
+    set command of cfg to "zsh -lic \\"source ~/.zshrc 2>/dev/null; ${escapeForAppleScript(claudeCmd)}\\""
+    set wait after command of cfg to true${envPart}
+    set win to new window with configuration cfg
+    activate window win
+  else
+    activate
+    delay 0.5
+    set t to focused terminal of selected tab of front window
+    input text "cd '${escapeForAppleScript(shellEscape(projectPath))}' && ${escapeForAppleScript(claudeCmd)}" to t
+    send key "enter" to t
   end if
 end tell`;
       break;
